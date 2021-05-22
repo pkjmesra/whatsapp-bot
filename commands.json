@@ -1,0 +1,86 @@
+{
+  "commands":
+    {
+      "welcome": {
+        "name" : "welcome",
+        "commandType" : "UserInput",
+        "toBeSent" : "Welcome to pkBot! Please enter/type *vaccine* if you'd like to search and book a vaccination slot.",
+        "responseType" : "string",
+        "expectedResponse" : "vaccine",
+        "nextCommand": "vaccine"
+      },
+      "vaccine": {
+        "name" : "vaccine",
+        "commandType" : "UserInput",
+        "toBeSent" : "Please enter the name of the state. For example, Maharashtra",
+        "responseType" : "string",
+        "expectedResponse" : "",
+        "nextCommand": "district"
+      },
+      "district": {
+        "name" : "district",
+        "commandType" : "UserInput",
+        "toBeSent" : "Please enter the name of the district. For example, Nagpur",
+        "responseType" : "string",
+        "expectedResponse" : "",
+        "nextCommand": "age"
+      },
+      "age": {
+        "name" : "age",
+        "commandType" : "UserInput",
+        "toBeSent" : "Please enter your age in years. For example, 45",
+        "responseType" : "number",
+        "expectedResponse" : "",
+        "nextCommand": "search"
+      },
+      "search": {
+        "name" : "search",
+        "commandType" : "Function",
+        "toBeSent" : "Go to https://selfregistration.cowin.gov.in/ immediately to book yourself \n*or* \nEnter/type the preferred center ID from the below list to attempt booking by bot\n\n",
+        "errorResponse" : "No available slots could be found!",
+        "responseType" : "number",
+        "expectedResponse" : "",
+        "nextCommand": "otp"
+      },
+      "otp": {
+        "name" : "otp",
+        "commandType" : "UserInput",
+        "toBeSent" : "Please enter the OTP received on this mobile number",
+        "responseType" : "number",
+        "expectedResponse" : "",
+        "nextCommand": "beneficiaries"
+      },
+      "beneficiaries": {
+        "name" : "beneficiaries",
+        "commandType" : "Function",
+        "toBeSent" : "",
+        "responseType" : "",
+        "expectedResponse" : "",
+        "nextCommand": "beneficiaryChoice"
+      },
+      "beneficiaryChoice": {
+        "name" : "beneficiaryChoice",
+        "commandType" : "UserInput",
+        "toBeSent" : "",
+        "responseType" : "number",
+        "expectedResponse" : "",
+        "nextCommand": "readCAPTCHA"
+      },
+      "readCAPTCHA": {
+        "name" : "readCAPTCHA",
+        "commandType" : "UserInput",
+        "toBeSent" : "",
+        "responseType" : "string",
+        "expectedResponse" : "",
+        "nextCommand": "otp"
+      },
+      "bookingConfirmation": {
+        "name" : "bookingConfirmation",
+        "commandType" : "Function",
+        "toBeSent" : "",
+        "responseType" : "",
+        "expectedResponse" : "",
+        "nextCommand": ""
+      }
+    }
+}
