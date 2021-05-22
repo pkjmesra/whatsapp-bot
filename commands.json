@@ -4,7 +4,7 @@
       "welcome": {
         "name" : "welcome",
         "commandType" : "UserInput",
-        "toBeSent" : "Welcome to pkBot! Please enter/type *vaccine* if you'd like to search and book a vaccination slot.",
+        "toBeSent" : "Welcome to pkBot! Please type *vaccine* to search for and book a vaccination slot.",
         "responseType" : "string",
         "expectedResponse" : "vaccine",
         "nextCommand": "vaccine"
@@ -16,6 +16,16 @@
         "responseType" : "string",
         "expectedResponse" : "",
         "nextCommand": "district"
+      },
+      "loadSavedData": {
+        "name" : "loadSavedData",
+        "commandType" : "UserInput",
+        "toBeSent" : "Please choose yes (y) or no (n).\n\nUse the following saved data?\n\nState: *%s*\nDistrict: *%s*\nAge: *%d*\n",
+        "responseType" : "boolean",
+        "expectedResponse" : "",
+        "nextYCommand": "search",
+        "nextNCommand": "vaccine",
+        "nextCommand": "vaccine"
       },
       "district": {
         "name" : "district",

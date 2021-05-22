@@ -1,8 +1,10 @@
 package pkBot
 
 import (
-	"strings"
+	// "fmt"
 	"strconv"
+	"strings"
+	
 	"github.com/pkjmesra/whatsapp-bot/pkWhatsApp"
 )
 
@@ -13,14 +15,16 @@ type RemoteClient struct {
 	LastSent			*Command
 	Received 			pkWhatsApp.Message
 	Host				*pkWhatsApp.WhatsappClient
-	Params 	 			SearchParams
+	Params 	 			*UserParams
 }
 
-type SearchParams struct {
+type UserParams struct {
 	State 			string
 	District		string
 	Age				int
 	OTP 			int
+	Beneficiaries	BeneficiaryList
+	BookingPrefs  	BookingSlot
 }
 // NewClient create whatsapp client
 func NewClient(msg pkWhatsApp.Message, wac *pkWhatsApp.WhatsappClient) *RemoteClient {
@@ -30,7 +34,7 @@ func NewClient(msg pkWhatsApp.Message, wac *pkWhatsApp.WhatsappClient) *RemoteCl
 							Received: msg, 
 							LastSent: &Command{}, 
 							LastReceived: pkWhatsApp.Message{},
-							Params: SearchParams{},
+							Params: &UserParams{},
 						}
 	bookingCenterId = 0
 	return &rc
@@ -52,7 +56,7 @@ func Respond (remoteClient *RemoteClient) {
 }
 
 func sendResponse(remoteClient *RemoteClient, userInput string) {
-	var cmd = evaluateInput(userInput)
+	var cmd = evaluateInput(remoteClient, userInput)
 	if cmd.CommandType == "UserInput" {
 		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
 		remoteClient.LastSent = cmd
@@ -98,7 +102,20 @@ func processUserInput(remoteClient *RemoteClient) {
 			sendResponse(remoteClient, "")
 		}
 	} else {
-		sendResponse(remoteClient, lastSent.NextCommand)
+		userInput = strings.ToLower(userInput)
+		nextCmd := lastSent.NextCommand
+		if (userInput == "y" || userInput == "yes") && lastSent.NextYCommand != "" {
+			nextCmd = lastSent.NextYCommand
+			if lastSent.Name == "loadSavedData" {
+				var params *UserParams
+				params , _ = readUser(remoteClient)
+				remoteClient.Params = params
+			}
+		} else if (userInput == "n" || userInput == "no") && lastSent.NextNCommand != "" {
+			nextCmd = lastSent.NextNCommand
+		}
+		lastSent.NextCommand = nextCmd
+		sendResponse(remoteClient, nextCmd)
 	}
 }
 
@@ -107,15 +124,19 @@ func saveUserInput(remoteClient *RemoteClient) {
 	var lastSent = remoteClient.LastSent
 	if lastSent.Name == "vaccine" {
 		remoteClient.Params.State = userInput
+		writeUser(remoteClient)
 	} else if lastSent.Name == "district" {
 		remoteClient.Params.District = userInput
+		writeUser(remoteClient)
 	} else if lastSent.Name == "age" {
 		if age, err := strconv.Atoi(userInput); err == nil {
 			remoteClient.Params.Age = age
+			writeUser(remoteClient)
 		}
 	} else if lastSent.Name == "otp" {
 		if otp, err := strconv.Atoi(userInput); err == nil {
 			remoteClient.Params.OTP = otp
+			writeUser(remoteClient)
 		}
 	}
 }
