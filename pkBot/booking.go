@@ -33,8 +33,26 @@ func bookAppointment(beneficiaryList *BeneficiaryList, captcha string, bookingSl
 		}
 	}
 	beneficiaries:= strings.Split(beneficiaryId, ",") //make([]string,1)
-	//beneficiaries[0] = beneficiaryId
-	postBody := map[string]interface{}{"center_id": bookingSlot.CenterID, "dose": 1, "captcha": captcha,"session_id": bookingSlot.SessionID, "slot": bookingSlot.Slot, "beneficiaries": beneficiaries}
+	var cnf string
+	err := errors.New("Booking failed because no request could be made")
+	var potentialSession PotentialSession
+	// postBody := map[string]interface{}{"center_id": , "dose": 1, "captcha": captcha,"session_id": bookingSlot.SessionID, "slot": bookingSlot.Slot, "beneficiaries": beneficiaries}
+	if bookingSlot.BookAnySlot {
+		for _, potentialSession = range bookingSlot.PotentialSessions {
+			if int(potentialSession.Dose1Capacity) >= len(beneficiaries) {
+				c := potentialSession.CenterID
+				s := potentialSession.SessionID
+				sl := potentialSession.Slots[0]
+				cnf, err = tryBookAppointment(c,captcha, s, sl, beneficiaries)
+				break
+			}
+		}
+	}
+	return cnf, err
+}
+
+func tryBookAppointment(centerId int, captcha, sessionId, slot string, beneficiaries []string) (string, error) {
+	postBody := map[string]interface{}{"center_id": centerId, "dose": 1, "captcha": captcha,"session_id": sessionId, "slot": slot, "beneficiaries": beneficiaries}
 	bodyBytes, err := queryServer(scheduleURLFormat, "POST", postBody)
 	cnf := AppointmentConfirmation{}
 	if err = json.Unmarshal(bodyBytes, &cnf); err != nil {

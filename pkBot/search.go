@@ -12,6 +12,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+type PotentialSession struct {
+	CenterID 		  int
+	SessionID         string
+	Date              string
+	AvailableCapacity float64
+	MinAgeLimit       int
+	Vaccine           string
+	Dose1Capacity     float64
+	Dose2Capacity     float64
+	Slots             []string
+}
 type BookingSlot struct {
 		Available 	bool
 		Preferred 	bool
@@ -21,6 +32,7 @@ type BookingSlot struct {
 		SessionID 	string
 		Slot 		string
 		Description string
+		PotentialSessions []PotentialSession
 	}
 
 var (
@@ -71,6 +83,7 @@ type Appointments struct {
 			Fee     string `json:"fee"`
 		} `json:"vaccine_fees"`
 		Sessions []struct {
+			CenterID 		  int
 			SessionID         string   `json:"session_id"`
 			Date              string   `json:"date"`
 			AvailableCapacity float64  `json:"available_capacity"`
@@ -93,7 +106,7 @@ func searchByPincode(pinCode string) (*BookingSlot, error) {
 	if err != nil {
 		return &bk, errors.Wrap(err, "Failed to fetch appointment sessions")
 	}
-	return getAvailableSessions(response, age, pinCode)
+	return getAvailableSessions(response, age, pinCode, &bk)
 }
 
 func getStateIDByName(state string) (int, error) {
@@ -132,42 +145,43 @@ func getDistrictIDByName(stateID int, district string) (int, error) {
 	return 0, errors.New("Invalid district name passed")
 }
 
-func searchByStateDistrict(age int, state, district string) (*BookingSlot, error) {
+func searchByStateDistrict(age int, state, district string, bk *BookingSlot) (*BookingSlot, error) {
 	var err1 error
-	bk := BookingSlot{Available:false}
+	// bk := BookingSlot{Available:false}
 	if stateID == 0 {
 		stateID, err1 = getStateIDByName(state)
 		if err1 != nil {
-			return &bk, err1
+			return bk, err1
 		}
 	}
 	if districtID == 0 {
 		districtID, err1 = getDistrictIDByName(stateID, district)
 		if err1 != nil {
-			return &bk, err1
+			return bk, err1
 		}
 	}
 	fmt.Fprintf(os.Stderr, "Searching with age:%d, state:%s, district:%s\n", age, state, district)
 	response, err := queryServer(fmt.Sprintf(calendarByDistrictURLFormat, districtID, timeNow()), "GET", nil)
 	if err != nil {
-		return &bk, errors.Wrap(err, "Failed to fetch appointment sessions")
+		return bk, errors.Wrap(err, "Failed to fetch appointment sessions")
 	}
 	var criteria = state + "," + district
-	var ck *BookingSlot
-	ck, err = getAvailableSessions(response, age, criteria)
-	return ck, err
+	// var ck *BookingSlot
+	bk, err = getAvailableSessions(response, age, criteria, bk)
+	return bk, err
 }
 
-func getAvailableSessions(response []byte, age int, criteria string) (*BookingSlot, error) {
-	bk := BookingSlot{Available:false, Preferred:false}
+func getAvailableSessions(response []byte, age int, criteria string, bk *BookingSlot) (*BookingSlot, error) {
+	ps := []PotentialSession{}
+	bk.PotentialSessions = ps // := BookingSlot{Available:false, Preferred:false, PotentialSessions: ps}
 	if response == nil {
 		// log.Printf("Received unexpected response, rechecking after %v seconds", interval)
-		return &bk, nil
+		return bk, nil
 	}
 	appnts := Appointments{}
 	err := json.Unmarshal(response, &appnts)
 	if err != nil {
-		return &bk, err
+		return bk, err
 	}
 	var buf bytes.Buffer
 	w := tabwriter.NewWriter(&buf, 1, 8, 1, '\t', 0)
@@ -176,11 +190,12 @@ func getAvailableSessions(response []byte, age int, criteria string) (*BookingSl
 	outer:
 	for _, center := range appnts.Centers {
 		for _, s := range center.Sessions {
-			fmt.Fprintf(os.Stderr, "CenterID: %d , AvailableCapacity:%.0f\n", center.CenterID, s.AvailableCapacity)
-			if s.MinAgeLimit <= age && (s.Dose1Capacity != 0 || s.Dose2Capacity != 0) {
+			capacity := s.Dose1Capacity
+			// fmt.Fprintf(os.Stderr, "CenterID: %d , AvailableCapacity:%.0f\n", center.CenterID, s.AvailableCapacity)
+			if s.MinAgeLimit <= age && (capacity != 0 ) { //|| s.Dose2Capacity != 0) {
 				if bookingCenterId > 0 {
 					if bookingCenterId == center.CenterID {
-						fmt.Fprintf(os.Stderr, "AvailableCapacity %.0f for selected center:%d\n", s.AvailableCapacity, center.CenterID)
+						// fmt.Fprintf(os.Stderr, "AvailableCapacity %.0f for selected center:%d\n", s.AvailableCapacity, center.CenterID)
 						bk.Preferred = true
 						bk.CenterID = center.CenterID
 						bk.SessionID = s.SessionID
@@ -189,7 +204,22 @@ func getAvailableSessions(response []byte, age int, criteria string) (*BookingSl
 						center.Name = "(Preferred) :" + center.Name
 					}
 				}
-				if bk.Preferred || bookingCenterId <= 0 {
+				if bk.BookAnySlot && capacity != 0 {
+					fmt.Fprintf(os.Stderr, "CenterID: %d , AvailableCapacity:%.0f, Dose1Capacity:%.0f\n", center.CenterID, s.AvailableCapacity,capacity)
+					s.CenterID = center.CenterID
+					newSession := PotentialSession{CenterID: s.CenterID,
+									SessionID: s.SessionID,
+									Date:s.Date,
+									AvailableCapacity: s.AvailableCapacity,
+									MinAgeLimit: s.MinAgeLimit,
+									Vaccine: s.Vaccine,
+									Dose1Capacity:capacity,
+									Dose2Capacity: s.Dose2Capacity,
+									Slots: s.Slots}
+					bk.PotentialSessions = append(bk.PotentialSessions, newSession)
+					fmt.Fprintf(os.Stderr, "New Potential Session added. Total Count:%d\n", len(bk.PotentialSessions))
+				}
+				if (bk.Preferred || bookingCenterId <= 0 || bk.BookAnySlot) && capacity != 0 {
 					count++
 					fmt.Fprintln(w, fmt.Sprintf("*(%d). Center\t  %s, %s, %s, %s, %d*", count, center.Name, center.Address, center.DistrictName, center.StateName, center.Pincode))
 					fmt.Fprintln(w, fmt.Sprintf("Fee\t  %s", center.FeeType))
@@ -203,7 +233,7 @@ func getAvailableSessions(response []byte, age int, criteria string) (*BookingSl
 					}
 					// fmt.Fprintln(w, fmt.Sprintf("Sessions\t"))
 					fmt.Fprintln(w, fmt.Sprintf("\t*Date\t  %s*", s.Date))
-					fmt.Fprintln(w, fmt.Sprintf("\t*Dose1Capacity\t  %.0f*", s.Dose1Capacity))
+					fmt.Fprintln(w, fmt.Sprintf("\t*Dose1Capacity\t  %.0f*", capacity))
 					fmt.Fprintln(w, fmt.Sprintf("\t*Dose2Capacity\t  %.0f*", s.Dose2Capacity))
 					fmt.Fprintln(w, fmt.Sprintf("\tMinAgeLimit\t  %d", s.MinAgeLimit))
 					fmt.Fprintln(w, fmt.Sprintf("\tVaccine\t  %s", s.Vaccine))
@@ -219,7 +249,7 @@ func getAvailableSessions(response []byte, age int, criteria string) (*BookingSl
 		}
 	}
 	if err := w.Flush(); err != nil {
-		return &bk, err
+		return bk, err
 	}
 	if buf.Len() == 0 {
 		if slotsAvailable {
@@ -227,10 +257,10 @@ func getAvailableSessions(response []byte, age int, criteria string) (*BookingSl
 			bk.Available = slotsAvailable
 		}
 		bk.Description = buf.String()
-		return &bk, nil
+		return bk, nil
 	}
 	slotsAvailable = true
 	bk.Available = slotsAvailable
 	bk.Description = buf.String()
-	return &bk, nil
+	return bk, nil
 }

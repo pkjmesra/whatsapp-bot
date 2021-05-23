@@ -4,10 +4,18 @@
       "welcome": {
         "name" : "welcome",
         "commandType" : "UserInput",
-        "toBeSent" : "Welcome to pkBot! Please type *vaccine* to search for and book a vaccination slot.",
+        "toBeSent" : "Welcome to pkBot!\nYou may try the following:\n\n1. Type *vaccine* to configure search parameters and book a vaccination slot.\n\n2. Type *book* to go right ahead to book an Appointment with pre-configured data.\n",
         "responseType" : "string",
         "expectedResponse" : "vaccine",
         "nextCommand": "vaccine"
+      },
+      "book": {
+        "name" : "book",
+        "commandType" : "Function",
+        "toBeSent" : "",
+        "responseType" : "string",
+        "expectedResponse" : "",
+        "nextCommand": "search"
       },
       "vaccine": {
         "name" : "vaccine",
@@ -20,7 +28,7 @@
       "loadSavedData": {
         "name" : "loadSavedData",
         "commandType" : "UserInput",
-        "toBeSent" : "Please choose yes (y) or no (n).\n\nUse the following saved data?\n\nState: *%s*\nDistrict: *%s*\nAge: *%d*\nCenterID: *%d*\n",
+        "toBeSent" : "Please choose yes (y) or no (n).\n\nUse the following saved data?\n\nState: *%s*\nDistrict: *%s*\nAge: *%d*\nPreferred CenterID: *%d*\nBookAtAnyCenter: *%t*\n\nIf *BookAtAnyCenter* is true (choose yes), it will try to book at any available center, not limited to preferred center.\n",
         "responseType" : "boolean",
         "expectedResponse" : "",
         "nextYCommand": "search",
@@ -41,6 +49,16 @@
         "toBeSent" : "Please enter your age in years. For example, 45",
         "responseType" : "number",
         "expectedResponse" : "",
+        "nextCommand": "bookanyslot"
+      },
+      "bookanyslot": {
+        "name" : "bookanyslot",
+        "commandType" : "UserInput",
+        "toBeSent" : "Would you like to book at any available center within %s ?\n\nPlease choose yes (y) or no (n).\n",
+        "responseType" : "number",
+        "expectedResponse" : "",
+        "nextYCommand": "search",
+        "nextNCommand": "search",
         "nextCommand": "search"
       },
       "search": {
@@ -64,7 +82,7 @@
       "beneficiaries": {
         "name" : "beneficiaries",
         "commandType" : "Function",
-        "toBeSent" : "Please choose from the following beneficiaries.\nEnter 1 to book only for the first beneficiary.\nYou can also type 1,2,3 etc. to choose multiple\n%s",
+        "toBeSent" : "Skip this if you have chosen *BookAnySlot*.\nPlease choose from the following beneficiaries.\nEnter 1 to book only for the first beneficiary.\nYou can also type 1,2,3 etc. to choose multiple\n%s",
         "responseType" : "",
         "expectedResponse" : "",
         "nextCommand": "readCAPTCHA"

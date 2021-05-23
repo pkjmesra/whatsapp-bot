@@ -46,11 +46,12 @@ func evaluateInput(remoteClient *RemoteClient, userInput string) *Command {
 	cmd := Command{}
 	var params *UserParams
 	var err error
+	userInput = strings.ToLower(userInput)
 	for key1, value1 := range commands {
-	  if strings.ToLower(userInput) == "vaccine" {
+	  if userInput == "vaccine" {
 	  	// See if we have saved data
 	  	params , err = readUser(remoteClient)
-	  	if err == nil && remoteClient.LastSent.Name == "welcome" {
+	  	if err == nil {
 	  		userInput = "loadSavedData"
 	  		fmt.Println("UserInput Changed to loadSavedData")
 	  	}
@@ -61,8 +62,8 @@ func evaluateInput(remoteClient *RemoteClient, userInput string) *Command {
 	  	break
 	  }
 	}
-	if remoteClient.LastSent.Name == "welcome" && cmd.Name == "loadSavedData" {
-		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, params.State, params.District, params.Age, params.BookingPrefs.CenterID)
+	if (remoteClient.LastSent.Name == "welcome" || userInput == "vaccine" || userInput == "loadSavedData") && cmd.Name == "loadSavedData" {
+		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, params.State, params.District, params.Age, params.BookingPrefs.CenterID, params.BookingPrefs.BookAnySlot)
 		fmt.Println(cmd.ToBeSent)
 	}
 	return &cmd
@@ -99,6 +100,7 @@ func writeUser(remoteClient *RemoteClient) error {
 	}
 	err = ioutil.WriteFile(path, file, 0644)
 	if err != nil {
+		fmt.Println(err)
 		return err
 	}
 	return nil

@@ -50,9 +50,13 @@ func NewClient(msg pkWhatsApp.Message, wac *pkWhatsApp.WhatsappClient) *RemoteCl
 
 func Respond (remoteClient *RemoteClient) {
 	message := remoteClient.Received.Source
+	userInput := strings.ToLower(remoteClient.Received.Text)
 	if message.Info.FromMe {
 		lastSent := remoteClient.LastSent
-		if lastSent.Name == "" {
+		if userInput == "vaccine" || userInput == "book" {
+			remoteClient.Params, _ = readUser(remoteClient)
+			sendResponse(remoteClient, userInput)
+		} else if lastSent.Name == "" {
 			sendResponse(remoteClient, "")
 		} else {
 			saveUserInput(remoteClient)
@@ -67,14 +71,36 @@ func sendResponse(remoteClient *RemoteClient, userInput string) {
 	var cmd = evaluateInput(remoteClient, userInput)
 	var err error
 	if cmd.CommandType == "UserInput" {
+		if cmd.Name == "bookanyslot" {
+			cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, remoteClient.Params.District)
+		}
 		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
 		updateClient(remoteClient, cmd)
 	} else if cmd.CommandType == "Function" {
 		lastSent := remoteClient.LastSent
+		if cmd.Name == "book" {
+			fmt.Println("Received booking request for pre-configured data")
+			params := remoteClient.Params
+			if params.State != "" && params.District != "" && params.Age > 0 {
+				fmt.Println("Pre-configured data found")
+				if lastSent.NextCommand == "" {
+					cd := Command{NextCommand:"search"}
+					remoteClient.LastSent = &cd
+				}
+				updateClient(remoteClient, cmd)
+				sendResponse(remoteClient, cmd.NextCommand)
+				return
+			} else {
+				fmt.Println("Pre-configured data not found")
+				sendResponse(remoteClient, "")
+			}
+			updateClient(remoteClient, cmd)
+			return
+		}
 		if lastSent.NextCommand == "search" {
 			var bk *BookingSlot
 			params := remoteClient.Params
-			bk, err = searchByStateDistrict(params.Age, params.State, params.District)
+			bk, err = searchByStateDistrict(params.Age, params.State, params.District, remoteClient.Params.BookingPrefs)
 			if err != nil{
 				fmt.Println("Error while searching for slots")
 				sendResponse(remoteClient, "")
@@ -86,13 +112,15 @@ func sendResponse(remoteClient *RemoteClient, userInput string) {
 					sendResponse(remoteClient, "")
 					return
 				}
-				if bookingCenterId <= 0 {
+				if bookingCenterId <= 0 && !remoteClient.Params.BookingPrefs.BookAnySlot {
 					fmt.Println("All slots being shared with user since preferred booking center is not set")
 					remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent + bk.Description)
 				}
-				if bookingCenterId > 0 && bk.Description != "" {
+				if (bookingCenterId > 0 || remoteClient.Params.BookingPrefs.BookAnySlot) && bk.Description != "" {
 					fmt.Println("Preferred booking center is set already and center has slots")
+					bk.BookAnySlot = remoteClient.Params.BookingPrefs.BookAnySlot
 					remoteClient.Params.BookingPrefs = bk
+					writeUser(remoteClient)
 					var txn *OTPTxn
 					txn, err = generateOTP(remoteClient.RemoteMobileNumber, false)
 					if err == nil && txn.TXNId != "" {
@@ -127,7 +155,7 @@ func sendResponse(remoteClient *RemoteClient, userInput string) {
 		} else if lastSent.NextCommand == "bookingConfirmation" {
 			var cnf string
 			cnf, err = bookAppointment(remoteClient.Params.Beneficiaries, remoteClient.Params.CAPTCHA, remoteClient.Params.BookingPrefs)
-			if err == nil {
+			if err == nil && cnf != "" {
 				if remoteClient.Params.ConfirmationID == "" {
 					remoteClient.Params.ConfirmationID = cnf
 				} else {
@@ -218,15 +246,24 @@ func processUserInput(remoteClient *RemoteClient) {
 				params , _ = readUser(remoteClient)
 				remoteClient.Params = params
 				bookingCenterId = remoteClient.Params.BookingPrefs.CenterID
+				fmt.Println("Saved  bookingCenterId")
+			} else if lastSent.Name == "bookanyslot" {
+				remoteClient.Params.BookingPrefs.BookAnySlot = true
+				writeUser(remoteClient)
+				fmt.Fprintf(os.Stderr, "Saved BookAnySlot. Set to %t.", remoteClient.Params.BookingPrefs.BookAnySlot)
 			}
 		} else if (userInput == "n" || userInput == "no") && lastSent.NextNCommand != "" {
 			nextCmd = lastSent.NextNCommand
 			if lastSent.Name == "loadSavedData" {
 				resetParams(remoteClient)
 				writeUser(remoteClient)
+			} else if lastSent.Name == "bookanyslot" {
+				remoteClient.Params.BookingPrefs.BookAnySlot = false
+				writeUser(remoteClient)
+				fmt.Println("Saved  BookAnySlot. Set to false.")
 			}
 		}
-		if lastSent.Name == "search" && bookingCenterId > 0 {
+		if lastSent.Name == "search" && bookingCenterId > 0 && !remoteClient.Params.BookingPrefs.BookAnySlot {
 			nextCmd = "search"
 		} else if lastSent.Name == "otp" && otpTransactionId != "" {
 			bearerToken, err = confirmOTP(userInput, remoteClient.Params.OTPTxnDetails.TXNId)
@@ -274,6 +311,7 @@ func saveUserInput(remoteClient *RemoteClient) {
 }
 
 func resetParams(remoteClient *RemoteClient) {
+	fmt.Println("Resetting Params.")
 	bookingCenterId = 0
 	stateID = 0
 	districtID = 0
