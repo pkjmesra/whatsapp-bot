@@ -12,6 +12,23 @@ go get github.com/pkjmesra/whatsapp-bot
 ## Usage
 
 ```go
+go build && go install && mv $GOPATH/bin/whatsapp-bot ./whatsapp-bot
+./whatsapp-bot -i 60 -m <91MobileNumber>
+```
+- i gives the interval to ping and poll for available vaccination slots for a given set of parameters
+- m can help setup a specific mobile number for which you'd like to book an appointment via whatsapp
+
+When you run, your mobile/whatsapp will become the host for sending/receiving data with <91MobileNumber>.
+
+- Every API call is automated for CoWIN. 
+- OTP is sent to your mobile <91MobileNumber>. Enter it in whatsapp when prompted.
+- CAPTCHA will be sent on whatsapp itself. Enter CAPTCHA to proceed for appointment.
+
+Entire transaction can be finished in <time taken for OTP> + <time taken for CAPTCHA>.
+
+Enjoy!
+
+```go
 package main
 
 import "github.com/pkjmesra/whatsapp-bot/pkWhatsApp"
