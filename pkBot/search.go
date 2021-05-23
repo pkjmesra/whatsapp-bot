@@ -14,6 +14,8 @@ import (
 
 type PotentialSession struct {
 	CenterID 		  int
+	CenterName 		  string
+	CenterAddress 	  string
 	SessionID         string
 	Date              string
 	AvailableCapacity float64
@@ -208,6 +210,8 @@ func getAvailableSessions(response []byte, age int, criteria string, bk *Booking
 					fmt.Fprintf(os.Stderr, "CenterID: %d , AvailableCapacity:%.0f, Dose1Capacity:%.0f\n", center.CenterID, s.AvailableCapacity,capacity)
 					s.CenterID = center.CenterID
 					newSession := PotentialSession{CenterID: s.CenterID,
+									CenterName : center.Name,
+									CenterAddress : center.Address,
 									SessionID: s.SessionID,
 									Date:s.Date,
 									AvailableCapacity: s.AvailableCapacity,

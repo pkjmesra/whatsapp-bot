@@ -47,6 +47,9 @@ func bookAppointment(beneficiaryList *BeneficiaryList, captcha string, bookingSl
 				sl := potentialSession.Slots[0]
 				fmt.Fprintf(os.Stderr, "Booking an appt with centerid:%d, captcha:%s, session:%s, slot:%s, and beneficiaries:%s\n", c, captcha, s, sl, beneficiaryId)
 				cnf, err = tryBookAppointment(c,captcha, s, sl, beneficiaries)
+				if err == nil && cnf != ""{
+					cnf = cnf + "\nCenter:" + potentialSession.CenterName + "\nAddress:" + potentialSession.CenterAddress + "\nSlot:" + sl + "\n"
+				}
 				break
 			}
 		}
@@ -69,6 +72,6 @@ func tryBookAppointment(centerId int, captcha, sessionId, slot string, beneficia
 		fmt.Fprintf(os.Stderr, "ErrorCode:%s , Error:%s\n", aptErr.ErrorCode, aptErr.Error)
 		return "", errors.New(fmt.Sprintf("Booking failed with statusCode: *%s : %s*\n", aptErr.ErrorCode, aptErr.Error))
 	}
-	fmt.Println("AppointmentID confirmed:" + cnf.ConfirmationId)
+	fmt.Println("AppointmentID confirmed with confirmation ID:" + cnf.ConfirmationId)
 	return cnf.ConfirmationId, nil
 }
