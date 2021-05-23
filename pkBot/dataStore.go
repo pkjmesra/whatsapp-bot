@@ -15,7 +15,8 @@ type Command struct {
 	ResponseType    	string  `json:"responseType"`
 	ExpectedResponse    string  `json:"expectedResponse"`
 	NextCommand  		string  `json:"nextCommand"`
-	ErrorResponse		string 	`json:"errorResponse"`
+	ErrorResponse1		string 	`json:"errorResponse1"`
+	ErrorResponse2		string 	`json:"errorResponse2"`
 	NextYCommand		string  `json:"nextYCommand"`
 	NextNCommand		string  `json:"nextNCommand"`
 }
@@ -40,7 +41,7 @@ func evaluateInput(remoteClient *RemoteClient, userInput string) *Command {
 	if userInput == "" {
 		userInput = "welcome"
 	}
-	fmt.Println("Received :" + userInput)
+	fmt.Println("Received userInput cmd: " + userInput)
 	commands := root["commands"].(map[string]interface{})
 	cmd := Command{}
 	var params *UserParams
@@ -61,7 +62,7 @@ func evaluateInput(remoteClient *RemoteClient, userInput string) *Command {
 	  }
 	}
 	if remoteClient.LastSent.Name == "welcome" && cmd.Name == "loadSavedData" {
-		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, params.State, params.District, params.Age)
+		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, params.State, params.District, params.Age, params.BookingPrefs.CenterID)
 		fmt.Println(cmd.ToBeSent)
 	}
 	return &cmd

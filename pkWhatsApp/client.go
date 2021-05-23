@@ -15,7 +15,8 @@ var (loggedInWANumber string)
 
 // WhatsappClient connect
 type WhatsappClient struct {
-	wac *whatsapp.Conn
+	wac 			*whatsapp.Conn
+	MobileNumber 	string
 }
 
 // NewClient create whatsapp client
@@ -37,7 +38,7 @@ func NewClient() *WhatsappClient {
 	}
 
 	fmt.Println("Whatsapp Connected!")
-	return &WhatsappClient{wac}
+	return &WhatsappClient{wac:wac, MobileNumber:loggedInWANumber}
 }
 
 // Listen text messages
@@ -71,6 +72,63 @@ func (wp *WhatsappClient) SendText(to string, text string) {
 	}
 }
 
+func (wp *WhatsappClient) SendImage(to, imageFile, extension, caption string) {
+	f, err := os.Open(imageFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error while loading %s image:%v",extension, err)
+	}
+	defer f.Close()
+	reply := whatsapp.ImageMessage{
+		Info: whatsapp.MessageInfo{
+			RemoteJid: to,
+		},
+		Type:    "image/" + extension, // png needs to be changed if you used different extension
+		Caption: caption,
+		Content: f,
+	}
+
+	msgID, err := wp.wac.Send(reply)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error sending message: %v", err)
+	} else {
+		fmt.Println("Message Sent -> ID : " + msgID)
+	}
+}
+
+// msg := whatsapp.VideoMessage{
+// 	Info: whatsapp.MessageInfo{
+// 		RemoteJid: "###########@s.whatsapp.net",
+// 	},
+// 	Type:    "video/mp4",
+// 	Caption: "Hello Gopher!",
+// 	Content: video, // the code os.Open("video.mp4")
+// }
+
+// msg := whatsapp.AudioMessage{
+// 	Info: whatsapp.MessageInfo{
+// 		RemoteJid: "###########@s.whatsapp.net",
+// 	},
+// 	Type:    "audio/ogg; codecs=opus",
+// 	Content: audio, // the code os.Open("audio.ogg")
+// }
+
+// msg := whatsapp.AudioMessage{
+// 	Info: whatsapp.MessageInfo{
+// 		RemoteJid: "###########@s.whatsapp.net",
+// 	},
+// 	Type:    "audio/mp3; codecs=opus", // tried removing `; codecs=opus` but nothing happens
+// 	Content: audio, // os.Open("audio.mp3")
+// }
+
+// msg := whatsapp.DocumentMessage{
+// 	Info: whatsapp.MessageInfo{
+// 		RemoteJid: "###########@s.whatsapp.net",
+// 	},
+// 	Type:      "document/docx",
+// 	Thumbnail: thumbnail,
+// 	Content:   document, // os.Open("document.docx")
+// }
+
 // GetConnection return whatsapp connection
 func (wp *WhatsappClient) GetConnection() *whatsapp.Conn {
 	return wp.wac
@@ -97,7 +155,6 @@ func login(wac *whatsapp.Conn) error {
 			return fmt.Errorf("error during login: %v", err)
 		}
 		fmt.Println("Login done -> ID : " + string(session.Wid))
-		loggedInWANumber = strings.TrimSuffix(string(session.Wid), "@c.us")
 	}
 
 	//save session
@@ -105,6 +162,7 @@ func login(wac *whatsapp.Conn) error {
 	if err != nil {
 		return fmt.Errorf("error saving session: %v", err)
 	}
+	loggedInWANumber = strings.TrimSuffix(string(session.Wid), "@c.us")
 	return nil
 }
 

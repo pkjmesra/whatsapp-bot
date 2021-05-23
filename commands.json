@@ -20,7 +20,7 @@
       "loadSavedData": {
         "name" : "loadSavedData",
         "commandType" : "UserInput",
-        "toBeSent" : "Please choose yes (y) or no (n).\n\nUse the following saved data?\n\nState: *%s*\nDistrict: *%s*\nAge: *%d*\n",
+        "toBeSent" : "Please choose yes (y) or no (n).\n\nUse the following saved data?\n\nState: *%s*\nDistrict: *%s*\nAge: *%d*\nCenterID: *%d*\n",
         "responseType" : "boolean",
         "expectedResponse" : "",
         "nextYCommand": "search",
@@ -47,7 +47,8 @@
         "name" : "search",
         "commandType" : "Function",
         "toBeSent" : "Go to https://selfregistration.cowin.gov.in/ immediately to book yourself \n*or* \nEnter/type the preferred center ID from the below list to attempt booking by bot\n\n",
-        "errorResponse" : "No available slots could be found!",
+        "errorResponse1" : "No available slots could be found!",
+        "errorResponse2" : "Sorry, OTP could not be generated for authentication.",
         "responseType" : "number",
         "expectedResponse" : "",
         "nextCommand": "otp"
@@ -63,32 +64,26 @@
       "beneficiaries": {
         "name" : "beneficiaries",
         "commandType" : "Function",
-        "toBeSent" : "",
+        "toBeSent" : "Please choose from the following beneficiaries.\nEnter 1 to book only for the first beneficiary.\nYou can also type 1,2,3 etc. to choose multiple\n%s",
         "responseType" : "",
-        "expectedResponse" : "",
-        "nextCommand": "beneficiaryChoice"
-      },
-      "beneficiaryChoice": {
-        "name" : "beneficiaryChoice",
-        "commandType" : "UserInput",
-        "toBeSent" : "",
-        "responseType" : "number",
         "expectedResponse" : "",
         "nextCommand": "readCAPTCHA"
       },
       "readCAPTCHA": {
         "name" : "readCAPTCHA",
-        "commandType" : "UserInput",
-        "toBeSent" : "",
+        "commandType" : "Function",
+        "toBeSent" : "Please type the exact characters (case sensitive) as you see in this CAPTCHA image\n",
         "responseType" : "string",
+        "errorResponse1" : "Failed getting CAPTCHA for %s.",
         "expectedResponse" : "",
-        "nextCommand": "otp"
+        "nextCommand": "bookingConfirmation"
       },
       "bookingConfirmation": {
         "name" : "bookingConfirmation",
         "commandType" : "Function",
-        "toBeSent" : "",
+        "toBeSent" : "Appointment confirmed! Appt ID: %s\n",
         "responseType" : "",
+        "errorResponse1" : "Appointment booking failed! %s\nPlease try again.",
         "expectedResponse" : "",
         "nextCommand": ""
       }

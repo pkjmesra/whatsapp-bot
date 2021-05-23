@@ -122,9 +122,9 @@ func queryServer(path string, method string, jsonBody map[string]interface{}) ([
 	if resp.StatusCode != http.StatusOK {
 		// Sometimes the API returns "Unauthenticated access!", do not fail in that case
 		if resp.StatusCode == http.StatusUnauthorized {
-			return nil, nil
+			return bodyBytes, errors.New(fmt.Sprintf("Request failed with statusCode: %d", resp.StatusCode))
 		}
-		return nil, errors.New(fmt.Sprintf("Request failed with statusCode: %d", resp.StatusCode))
+		return bodyBytes, errors.New(fmt.Sprintf("Request failed with statusCode: %d", resp.StatusCode))
 	}
 	return bodyBytes, nil
 }

@@ -9,6 +9,7 @@ import (
 
 	// "github.com/pkg/errors"
 )
+var (beneficiariesList *BeneficiaryList)
 
 type BeneficiaryList struct {
 	Beneficiaries []struct {
@@ -39,6 +40,7 @@ type BeneficiaryList struct {
 			Slot  				string `json:"slot"`
 		} `json:"appointments"`
 	} `json:"beneficiaries"`
+	Description 		string
 }
 
 type AppointmentList struct {
@@ -50,6 +52,7 @@ type AppointmentList struct {
 func getBeneficiaries() (*BeneficiaryList, error) {
 	response, err := queryServer(beneficiariesURLFormat, "GET", nil)
 	beneficiaryList := BeneficiaryList{}
+	beneficiaryList.Description = ""
 	err = json.Unmarshal(response, &beneficiaryList)
 	if err != nil {
 		log.Printf("Error parsing response: %v",err.Error())
@@ -57,21 +60,23 @@ func getBeneficiaries() (*BeneficiaryList, error) {
 	}
 	var buf bytes.Buffer
 	w := tabwriter.NewWriter(&buf, 1, 8, 1, '\t', 0)
-
+	count := 0
 	for _, beneficiary := range beneficiaryList.Beneficiaries {
-		fmt.Fprintln(w, fmt.Sprintf("\nBeneficiaryID\t  %s", beneficiary.ReferenceID))
-		fmt.Fprintln(w, fmt.Sprintf("Name\t  %s", beneficiary.Name))
-		fmt.Fprintln(w, fmt.Sprintf("PhotoIdType\t  %s", beneficiary.PhotoIdType))
-		fmt.Fprintln(w, fmt.Sprintf("PhotoIdNumber\t  %s", beneficiary.PhotoIdNumber))
-		fmt.Fprintln(w, fmt.Sprintf("Status\t  %s", beneficiary.VaccinationStat))
-		fmt.Fprintln(w, fmt.Sprintf("Dose1Date\t  %s", beneficiary.Dose1Date))
-		fmt.Fprintln(w, fmt.Sprintf("Dose2Date\t  %s", beneficiary.Dose2Date))
+		count++
+		fmt.Fprintln(w, fmt.Sprintf("\n\n*( %d )*", count))
+		fmt.Fprintln(w, fmt.Sprintf("BeneficiaryID : *%s*", beneficiary.ReferenceID))
+		fmt.Fprintln(w, fmt.Sprintf("Name          : *%s*", beneficiary.Name))
+		fmt.Fprintln(w, fmt.Sprintf("PhotoIdType   : %s", beneficiary.PhotoIdType))
+		fmt.Fprintln(w, fmt.Sprintf("PhotoIdNumber : %s", beneficiary.PhotoIdNumber))
+		fmt.Fprintln(w, fmt.Sprintf("Status        : %s", beneficiary.VaccinationStat))
+		fmt.Fprintln(w, fmt.Sprintf("Dose1Date     : %s", beneficiary.Dose1Date))
+		fmt.Fprintln(w, fmt.Sprintf("Dose2Date     : %s", beneficiary.Dose2Date))
 		for _, appt := range beneficiary.Appointments {
-			fmt.Fprintln(w, fmt.Sprintf("AppointmentID\t  %s", appt.AppointmentID))
-			fmt.Fprintln(w, fmt.Sprintf("SessionID\t  %s", appt.SessionID))
-			fmt.Fprintln(w, fmt.Sprintf("Dose\t  %d", appt.Dose))
-			fmt.Fprintln(w, fmt.Sprintf("Date\t  %s", appt.Date))
-			fmt.Fprintln(w, fmt.Sprintf("Slot\t  %s\n", appt.Slot))
+			fmt.Fprintln(w, fmt.Sprintf("AppointmentID : %s", appt.AppointmentID))
+			fmt.Fprintln(w, fmt.Sprintf("SessionID     : %s", appt.SessionID))
+			fmt.Fprintln(w, fmt.Sprintf("Dose:         : %d", appt.Dose))
+			fmt.Fprintln(w, fmt.Sprintf("Date:         : %s", appt.Date))
+			fmt.Fprintln(w, fmt.Sprintf("Slot          : %s\n", appt.Slot))
 		}
 	}
 	
@@ -81,7 +86,8 @@ func getBeneficiaries() (*BeneficiaryList, error) {
 	}
 	if buf.Len() == 0 {
 		return &beneficiaryList, nil
+	} else {
+		beneficiaryList.Description = buf.String()
 	}
-	// sendwhatsapptext("Beneficiaries registered:\n" + buf.String())
 	return &beneficiaryList, err
 }

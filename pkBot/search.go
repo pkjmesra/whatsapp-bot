@@ -23,10 +23,8 @@ type BookingSlot struct {
 	}
 
 var (
-	otpTransactionId, bearerToken, lastOTP string
 	slotsAvailable bool
 	bookingSlot *BookingSlot
-	beneficiariesList *BeneficiaryList
 	age, pinCode, bookingCenterId, stateID, districtID int
 )
 
@@ -136,13 +134,17 @@ func getDistrictIDByName(stateID int, district string) (int, error) {
 func searchByStateDistrict(age int, state, district string) (*BookingSlot, error) {
 	var err1 error
 	bk := BookingSlot{Available:false}
-	stateID, err1 = getStateIDByName(state)
-	if err1 != nil {
-		return &bk, err1
+	if stateID == 0 {
+		stateID, err1 = getStateIDByName(state)
+		if err1 != nil {
+			return &bk, err1
+		}
 	}
-	districtID, err1 = getDistrictIDByName(stateID, district)
-	if err1 != nil {
-		return &bk, err1
+	if districtID == 0 {
+		districtID, err1 = getDistrictIDByName(stateID, district)
+		if err1 != nil {
+			return &bk, err1
+		}
 	}
 	fmt.Fprintf(os.Stderr, "Searching with age:%d, state:%s, district:%s\n", age, state, district)
 	response, err := queryServer(fmt.Sprintf(calendarByDistrictURLFormat, districtID, timeNow()), "GET", nil)
@@ -173,8 +175,19 @@ func getAvailableSessions(response []byte, age int, criteria string) (*BookingSl
 	outer:
 	for _, center := range appnts.Centers {
 		for _, s := range center.Sessions {
-			fmt.Fprintf(os.Stderr, "AvailableCapacity:%.0f\n", s.AvailableCapacity)
+			fmt.Fprintf(os.Stderr, "CenterID: %d , AvailableCapacity:%.0f\n", center.CenterID, s.AvailableCapacity)
 			if s.MinAgeLimit <= age && (s.Dose1Capacity != 0 || s.Dose2Capacity != 0) {
+				if bookingCenterId > 0 {
+					if bookingCenterId == center.CenterID {
+						fmt.Fprintf(os.Stderr, "AvailableCapacity %.0f for selected center:%d\n", s.AvailableCapacity, center.CenterID)
+						bk.Preferred = true
+						bk.CenterID = center.CenterID
+						bk.SessionID = s.SessionID
+						bk.CenterName = center.Name
+						bk.Slot = s.Slots[0]
+						center.Name = "(Preferred) :" + center.Name
+					}
+				}
 				if bk.Preferred || bookingCenterId <= 0 {
 					count++
 					fmt.Fprintln(w, fmt.Sprintf("*(%d). Center\t  %s, %s, %s, %s, %d*", count, center.Name, center.Address, center.DistrictName, center.StateName, center.Pincode))
