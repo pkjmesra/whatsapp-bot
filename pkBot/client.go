@@ -119,6 +119,7 @@ func sendResponse(remoteClient *RemoteClient, userInput string) {
 				cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, beneficiariesList.Description)
 				remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
 				updateClient(remoteClient, cmd)
+				sendResponse(remoteClient, cmd.NextCommand)
 			}
 		} else if lastSent.NextCommand == "readCAPTCHA" {
 			sendCAPTCHA(remoteClient, cmd)
@@ -144,6 +145,22 @@ func sendResponse(remoteClient *RemoteClient, userInput string) {
 		}
 	} else {
 		sendResponse(remoteClient, "")
+	}
+}
+
+func sendOTP(remoteClient *RemoteClient, cmd *Command) {
+	txn, err := generateOTP(remoteClient.RemoteMobileNumber, false)
+	if err == nil && txn.TXNId != "" {
+		remoteClient.Params.OTPTxnDetails = txn
+		writeUser(remoteClient)
+		updateClient(remoteClient, cmd)
+		sendResponse(remoteClient, cmd.NextCommand)
+		return
+	} else {
+		fmt.Println("Failed generating OTP for " + remoteClient.RemoteMobileNumber)
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
+		sendResponse(remoteClient, "")
+		return
 	}
 }
 

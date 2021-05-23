@@ -16,6 +16,7 @@ type BookingSlot struct {
 		Available 	bool
 		Preferred 	bool
 		CenterID 	int
+		BookAnySlot bool
 		CenterName  string
 		SessionID 	string
 		Slot 		string
