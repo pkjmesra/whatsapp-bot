@@ -44,20 +44,21 @@ func NewClient(msg pkWhatsApp.Message, wac *pkWhatsApp.WhatsappClient) *RemoteCl
 							LastReceived: pkWhatsApp.Message{},
 							Params: &UserParams{},
 						}
-	resetParams(&rc)
+	resetParams(&rc, true)
 	return &rc
 }
 
 func Respond (remoteClient *RemoteClient) {
 	message := remoteClient.Received.Source
 	userInput := strings.ToLower(remoteClient.Received.Text)
-	if message.Info.FromMe {
+	if message.Info.FromMe || remoteClient.RemoteJID == remoteClient.RemoteMobileNumber + "@s.whatsapp.net" {
 		lastSent := remoteClient.LastSent
 		if userInput == "vaccine" || userInput == "book" {
 			remoteClient.Params, _ = readUser(remoteClient)
-			sendResponse(remoteClient, userInput)
+			SendResponse(remoteClient, userInput)
 		} else if lastSent.Name == "" {
-			sendResponse(remoteClient, "")
+			fmt.Println("Restarting because lastsent.Name is empty")
+			SendResponse(remoteClient, "")
 		} else {
 			saveUserInput(remoteClient)
 			processUserInput(remoteClient)
@@ -67,7 +68,8 @@ func Respond (remoteClient *RemoteClient) {
 	}
 }
 
-func sendResponse(remoteClient *RemoteClient, userInput string) {
+func SendResponse(remoteClient *RemoteClient, userInput string) {
+	fmt.Println("Received Response request with userInput:" + userInput)
 	var cmd = evaluateInput(remoteClient, userInput)
 	var err error
 	if cmd.CommandType == "UserInput" {
@@ -88,28 +90,26 @@ func sendResponse(remoteClient *RemoteClient, userInput string) {
 					remoteClient.LastSent = &cd
 				}
 				updateClient(remoteClient, cmd)
-				sendResponse(remoteClient, cmd.NextCommand)
+				SendResponse(remoteClient, cmd.NextCommand)
 				return
 			} else {
-				fmt.Println("Pre-configured data not found")
-				sendResponse(remoteClient, "")
+				fmt.Println("Restarting because pre-configured data not found")
+				SendResponse(remoteClient, "")
 			}
 			updateClient(remoteClient, cmd)
 			return
 		}
 		if lastSent.NextCommand == "search" {
-			var bk *BookingSlot
-			params := remoteClient.Params
-			bk, err = searchByStateDistrict(params.Age, params.State, params.District, remoteClient.Params.BookingPrefs)
+			bk, err := Search(remoteClient)
 			if err != nil{
-				fmt.Println("Error while searching for slots")
-				sendResponse(remoteClient, "")
+				fmt.Println("Restarting because error while searching for slots")
+				SendResponse(remoteClient, "")
 			} else {
 				if bk.Description == "" {
-					fmt.Println("No slot found from the search")
+					fmt.Println("Restarting because no slot found from the search")
 					cmd.ToBeSent = cmd.ErrorResponse1
 					remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
-					sendResponse(remoteClient, "")
+					SendResponse(remoteClient, "")
 					return
 				}
 				if bookingCenterId <= 0 && !remoteClient.Params.BookingPrefs.BookAnySlot {
@@ -127,12 +127,12 @@ func sendResponse(remoteClient *RemoteClient, userInput string) {
 						remoteClient.Params.OTPTxnDetails = txn
 						writeUser(remoteClient)
 						updateClient(remoteClient, cmd)
-						sendResponse(remoteClient, cmd.NextCommand)
+						SendResponse(remoteClient, cmd.NextCommand)
 						return
 					} else {
-						fmt.Println("Failed generating OTP for " + remoteClient.RemoteMobileNumber)
+						fmt.Println("Restarting because failed generating OTP for " + remoteClient.RemoteMobileNumber)
 						remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
-						sendResponse(remoteClient, "")
+						SendResponse(remoteClient, "")
 						return
 					}
 				}
@@ -147,12 +147,12 @@ func sendResponse(remoteClient *RemoteClient, userInput string) {
 				cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, beneficiariesList.Description)
 				remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
 				updateClient(remoteClient, cmd)
-				sendResponse(remoteClient, cmd.NextCommand)
+				SendResponse(remoteClient, cmd.NextCommand)
 			}
-		} else if lastSent.NextCommand == "readCAPTCHA" {
+		} else if lastSent.NextCommand == "readcaptcha" {
 			sendCAPTCHA(remoteClient, cmd)
 			updateClient(remoteClient, cmd)
-		} else if lastSent.NextCommand == "bookingConfirmation" {
+		} else if lastSent.NextCommand == "bookingconfirmation" {
 			var cnf string
 			cnf, err = bookAppointment(remoteClient.Params.Beneficiaries, remoteClient.Params.CAPTCHA, remoteClient.Params.BookingPrefs)
 			if err == nil && cnf != "" {
@@ -168,12 +168,21 @@ func sendResponse(remoteClient *RemoteClient, userInput string) {
 			} else {
 				cmd.ErrorResponse1 = fmt.Sprintf(cmd.ErrorResponse1, err.Error())
 				remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse1)
-				sendResponse(remoteClient, "")
+				fmt.Println("Restarting because appointment confirmation failed.")
+				SendResponse(remoteClient, "")
 			}
 		}
 	} else {
-		sendResponse(remoteClient, "")
+		fmt.Println("Restarting because commandtype is neither function nor userInput")
+		SendResponse(remoteClient, "")
 	}
+}
+
+func Search(remoteClient *RemoteClient) (*BookingSlot, error) {
+	remoteClient.Params, _ = readUser(remoteClient)
+	params := remoteClient.Params
+	bk, err := searchByStateDistrict(params.Age, params.State, params.District, remoteClient.Params.BookingPrefs)
+	return bk, err
 }
 
 func sendOTP(remoteClient *RemoteClient, cmd *Command) {
@@ -182,45 +191,46 @@ func sendOTP(remoteClient *RemoteClient, cmd *Command) {
 		remoteClient.Params.OTPTxnDetails = txn
 		writeUser(remoteClient)
 		updateClient(remoteClient, cmd)
-		sendResponse(remoteClient, cmd.NextCommand)
+		SendResponse(remoteClient, cmd.NextCommand)
 		return
 	} else {
-		fmt.Println("Failed generating OTP for " + remoteClient.RemoteMobileNumber)
+		fmt.Println("Restarting because failed generating OTP for " + remoteClient.RemoteMobileNumber)
 		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
-		sendResponse(remoteClient, "")
+		SendResponse(remoteClient, "")
 		return
 	}
 }
 
 func sendCAPTCHA(remoteClient *RemoteClient, cmd *Command) {
+	fmt.Println("Now sending CAPTCHA request")
 	fileName := remoteClient.RemoteMobileNumber + "_captcha"
 	err := getCaptchaSVG(fileName + ".svg")
 	var f string
 	if err != nil {
-		fmt.Println("Failed getting CAPTCHA for " + remoteClient.RemoteMobileNumber)
+		fmt.Println("Restarting because failed getting CAPTCHA(svg) for " + remoteClient.RemoteMobileNumber)
 		remoteClient.Host.SendText(remoteClient.RemoteJID, fmt.Sprintf(cmd.ErrorResponse1, remoteClient.RemoteMobileNumber))
-		sendResponse(remoteClient, "")
+		SendResponse(remoteClient, "")
 		return
 	}
 	err = exportToPng(fileName + ".svg", fileName + ".png")
 	if err != nil {
-		fmt.Println("Failed getting CAPTCHA for " + remoteClient.RemoteMobileNumber)
+		fmt.Println("Restarting because Failed getting CAPTCHA(png) for " + remoteClient.RemoteMobileNumber)
 		remoteClient.Host.SendText(remoteClient.RemoteJID, fmt.Sprintf(cmd.ErrorResponse1, remoteClient.RemoteMobileNumber))
-		sendResponse(remoteClient, "")
+		SendResponse(remoteClient, "")
 		return
 	}
 	_ , f, _ , err = getPngImage(fileName + ".png")
 	if err != nil {
-		fmt.Println("Failed getting CAPTCHA for " + remoteClient.RemoteMobileNumber)
+		fmt.Println("Restarting because failed getting CAPTCHA(getpng) for " + remoteClient.RemoteMobileNumber)
 		remoteClient.Host.SendText(remoteClient.RemoteJID, fmt.Sprintf(cmd.ErrorResponse1, remoteClient.RemoteMobileNumber))
-		sendResponse(remoteClient, "")
+		SendResponse(remoteClient, "")
 		return
 	}
 	f, err = getJPEGImage(fileName + ".png")
 	if err != nil {
-		fmt.Println("Failed getting CAPTCHA for " + remoteClient.RemoteMobileNumber)
+		fmt.Println("Restarting because failed getting CAPTCHA(jpg) for " + remoteClient.RemoteMobileNumber)
 		remoteClient.Host.SendText(remoteClient.RemoteJID, fmt.Sprintf(cmd.ErrorResponse1, remoteClient.RemoteMobileNumber))
-		sendResponse(remoteClient, "")
+		SendResponse(remoteClient, "")
 		return
 	}
 	remoteClient.Host.SendImage(remoteClient.RemoteJID, f, "jpeg", cmd.ToBeSent)
@@ -232,19 +242,20 @@ func processUserInput(remoteClient *RemoteClient) {
 	var err error
 	if lastSent.ExpectedResponse != "" {
 		if lastSent.ExpectedResponse == strings.ToLower(userInput) {
-			sendResponse(remoteClient, lastSent.NextCommand)
+			SendResponse(remoteClient, lastSent.NextCommand)
 		} else {
-			sendResponse(remoteClient, "")
+			fmt.Println("Restarting because ExpectedResponse is different from userInput")
+			SendResponse(remoteClient, "")
 		}
 	} else {
 		userInput = strings.ToLower(userInput)
 		nextCmd := lastSent.NextCommand
 		if (userInput == "y" || userInput == "yes") && lastSent.NextYCommand != "" {
 			nextCmd = lastSent.NextYCommand
-			if lastSent.Name == "loadSavedData" {
-				var params *UserParams
-				params , _ = readUser(remoteClient)
-				remoteClient.Params = params
+			var params *UserParams
+			params , _ = readUser(remoteClient)
+			remoteClient.Params = params
+			if lastSent.Name == "loadsaveddata" {
 				bookingCenterId = remoteClient.Params.BookingPrefs.CenterID
 				fmt.Println("Saved  bookingCenterId")
 			} else if lastSent.Name == "bookanyslot" {
@@ -254,9 +265,11 @@ func processUserInput(remoteClient *RemoteClient) {
 			}
 		} else if (userInput == "n" || userInput == "no") && lastSent.NextNCommand != "" {
 			nextCmd = lastSent.NextNCommand
-			if lastSent.Name == "loadSavedData" {
-				resetParams(remoteClient)
-				writeUser(remoteClient)
+			var params *UserParams
+			params , _ = readUser(remoteClient)
+			remoteClient.Params = params
+			if lastSent.Name == "loadsaveddata" {
+				resetParams(remoteClient, false)
 			} else if lastSent.Name == "bookanyslot" {
 				remoteClient.Params.BookingPrefs.BookAnySlot = false
 				writeUser(remoteClient)
@@ -271,11 +284,11 @@ func processUserInput(remoteClient *RemoteClient) {
 				remoteClient.Params.OTPTxnDetails.BearerToken = bearerToken
 				writeUser(remoteClient)
 			}
-		} else if lastSent.Name == "readCAPTCHA" {
-			nextCmd = "bookingConfirmation"
+		} else if lastSent.Name == "readcaptcha" {
+			nextCmd = "bookingconfirmation"
 		}
 		lastSent.NextCommand = nextCmd
-		sendResponse(remoteClient, nextCmd)
+		SendResponse(remoteClient, nextCmd)
 	}
 }
 
@@ -304,13 +317,13 @@ func saveUserInput(remoteClient *RemoteClient) {
 			remoteClient.Params.BookingPrefs.CenterID = bookingCenterId
 			writeUser(remoteClient)
 		}
-	} else if lastSent.Name == "readCAPTCHA" {
+	} else if lastSent.Name == "readcaptcha" {
 		remoteClient.Params.CAPTCHA = userInput
 		writeUser(remoteClient)
 	}
 }
 
-func resetParams(remoteClient *RemoteClient) {
+func resetParams(remoteClient *RemoteClient, shouldReload bool) {
 	fmt.Println("Resetting Params.")
 	bookingCenterId = 0
 	stateID = 0
@@ -318,8 +331,13 @@ func resetParams(remoteClient *RemoteClient) {
 	remoteClient.Params = &UserParams{}
 	remoteClient.Params.CAPTCHA = ""
 	remoteClient.Params.OTPTxnDetails = &OTPTxn{}
-	remoteClient.Params.BookingPrefs = &BookingSlot{}
+	remoteClient.Params.BookingPrefs = &BookingSlot{CenterID:0, BookAnySlot:true}
 	remoteClient.Params.Beneficiaries = &BeneficiaryList{}
+	if shouldReload {
+		remoteClient.Params, _ = readUser(remoteClient)
+	} else {
+		writeUser(remoteClient)
+	}
 }
 
 func updateClient(remoteClient *RemoteClient, cmd *Command) {

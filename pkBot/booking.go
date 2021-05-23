@@ -21,6 +21,7 @@ type ApptRequestError struct {
 
 func bookAppointment(beneficiaryList *BeneficiaryList, captcha string, bookingSlot *BookingSlot) (string, error) {
 	beneficiaryId := ""
+	fmt.Fprintf(os.Stderr, "Booking will be attempted for potentials sessions: %d", len(bookingSlot.PotentialSessions))
 	// outer:
 	for _, beneficiary := range beneficiaryList.Beneficiaries {
 		if beneficiary.VaccinationStat == "Not Vaccinated" {
@@ -35,6 +36,7 @@ func bookAppointment(beneficiaryList *BeneficiaryList, captcha string, bookingSl
 	beneficiaries:= strings.Split(beneficiaryId, ",") //make([]string,1)
 	var cnf string
 	err := errors.New("Booking failed because no request could be made")
+
 	var potentialSession PotentialSession
 	// postBody := map[string]interface{}{"center_id": , "dose": 1, "captcha": captcha,"session_id": bookingSlot.SessionID, "slot": bookingSlot.Slot, "beneficiaries": beneficiaries}
 	if bookingSlot.BookAnySlot {
@@ -43,6 +45,7 @@ func bookAppointment(beneficiaryList *BeneficiaryList, captcha string, bookingSl
 				c := potentialSession.CenterID
 				s := potentialSession.SessionID
 				sl := potentialSession.Slots[0]
+				fmt.Fprintf(os.Stderr, "Booking an appt with centerid:%d, captcha:%s, session:%s, slot:%s, and beneficiaries:%s\n", c, captcha, s, sl, beneficiaryId)
 				cnf, err = tryBookAppointment(c,captcha, s, sl, beneficiaries)
 				break
 			}

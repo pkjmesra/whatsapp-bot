@@ -4,7 +4,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"os"
-	"os/signal"
+	// "os/signal"
 	"time"
 	"strings"
 	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
@@ -45,14 +45,14 @@ func NewClient() *WhatsappClient {
 func (wp *WhatsappClient) Listen(f messageListener) {
 	wp.wac.AddHandler(&messageHandler{f, time.Now().Unix()})
 
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, os.Interrupt)
+	// sigs := make(chan os.Signal, 1)
+	// signal.Notify(sigs, os.Interrupt)
 
-	fmt.Println("Press ctrl+c to exit.")
+	// fmt.Println("Press ctrl+c to exit.")
 
-	<-sigs
-	fmt.Println("Shutdown.")
-	os.Exit(0)
+	// <-sigs
+	// fmt.Println("Shutdown.")
+	// os.Exit(0)
 }
 
 // SendText send text message

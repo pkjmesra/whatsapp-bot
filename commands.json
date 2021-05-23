@@ -25,15 +25,23 @@
         "expectedResponse" : "",
         "nextCommand": "district"
       },
-      "loadSavedData": {
-        "name" : "loadSavedData",
+      "loadsaveddata": {
+        "name" : "loadsaveddata",
         "commandType" : "UserInput",
         "toBeSent" : "Please choose yes (y) or no (n).\n\nUse the following saved data?\n\nState: *%s*\nDistrict: *%s*\nAge: *%d*\nPreferred CenterID: *%d*\nBookAtAnyCenter: *%t*\n\nIf *BookAtAnyCenter* is true (choose yes), it will try to book at any available center, not limited to preferred center.\n",
         "responseType" : "boolean",
         "expectedResponse" : "",
         "nextYCommand": "search",
-        "nextNCommand": "vaccine",
+        "nextNCommand": "state",
         "nextCommand": "vaccine"
+      },
+      "state": {
+        "name" : "state",
+        "commandType" : "UserInput",
+        "toBeSent" : "Please enter the name of the state. For example, Maharashtra",
+        "responseType" : "string",
+        "expectedResponse" : "",
+        "nextCommand": "district"
       },
       "district": {
         "name" : "district",
@@ -85,19 +93,19 @@
         "toBeSent" : "Skip this if you have chosen *BookAnySlot*.\nPlease choose from the following beneficiaries.\nEnter 1 to book only for the first beneficiary.\nYou can also type 1,2,3 etc. to choose multiple\n%s",
         "responseType" : "",
         "expectedResponse" : "",
-        "nextCommand": "readCAPTCHA"
+        "nextCommand": "readcaptcha"
       },
-      "readCAPTCHA": {
-        "name" : "readCAPTCHA",
+      "readcaptcha": {
+        "name" : "readcaptcha",
         "commandType" : "Function",
         "toBeSent" : "Please type the exact characters (case sensitive) as you see in this CAPTCHA image\n",
         "responseType" : "string",
         "errorResponse1" : "Failed getting CAPTCHA for %s.",
         "expectedResponse" : "",
-        "nextCommand": "bookingConfirmation"
+        "nextCommand": "bookingconfirmation"
       },
-      "bookingConfirmation": {
-        "name" : "bookingConfirmation",
+      "bookingconfirmation": {
+        "name" : "bookingconfirmation",
         "commandType" : "Function",
         "toBeSent" : "Appointment confirmed! Appt ID: %s\n",
         "responseType" : "",

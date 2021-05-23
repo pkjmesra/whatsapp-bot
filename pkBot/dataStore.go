@@ -46,26 +46,32 @@ func evaluateInput(remoteClient *RemoteClient, userInput string) *Command {
 	cmd := Command{}
 	var params *UserParams
 	var err error
+	params , err = readUser(remoteClient)
 	userInput = strings.ToLower(userInput)
 	for key1, value1 := range commands {
-	  if userInput == "vaccine" {
+	  if userInput == "vaccine" && params.State != "" && params.District != "" && params.Age > 0 {
 	  	// See if we have saved data
-	  	params , err = readUser(remoteClient)
 	  	if err == nil {
-	  		userInput = "loadSavedData"
+	  		userInput = "loadsaveddata"
 	  		fmt.Println("UserInput Changed to loadSavedData")
+	  	} else{
+	  		fmt.Println("Error while loading data from user file")
 	  	}
 	  } // Each value is an interface{} type, that is type asserted as a string
 	  if key1 == userInput {
 	  	value, _ := json.Marshal(value1)
-	  	json.Unmarshal([]byte(string(value)), &cmd)
+	  	err = json.Unmarshal([]byte(string(value)), &cmd)
+	  	if err != nil {
+	  		fmt.Println("Error unmarshaling data for " + string(value))
+	  	}
 	  	break
 	  }
 	}
-	if (remoteClient.LastSent.Name == "welcome" || userInput == "vaccine" || userInput == "loadSavedData") && cmd.Name == "loadSavedData" {
+	if (remoteClient.LastSent.Name == "welcome" || userInput == "vaccine" || userInput == "loadsaveddata") && cmd.Name == "loadsaveddata" {
 		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, params.State, params.District, params.Age, params.BookingPrefs.CenterID, params.BookingPrefs.BookAnySlot)
 		fmt.Println(cmd.ToBeSent)
 	}
+	fmt.Println("Returning cmd:" + cmd.Name)
 	return &cmd
 }
 
@@ -80,8 +86,10 @@ func readUser(remoteClient *RemoteClient) (*UserParams, error) {
 	defer jsonFile.Close()
 
     byteValue, _ := ioutil.ReadAll(jsonFile)
-    json.Unmarshal([]byte(byteValue), &params)
-
+    err = json.Unmarshal([]byte(byteValue), &params)
+    if err != nil {
+  		fmt.Println("Error unmarshaling data(readUser) for " + string(byteValue))
+  	}
     return &params, err
 }
 
@@ -89,17 +97,20 @@ func writeUser(remoteClient *RemoteClient) error {
 	path := os.TempDir() + "pkBotUsers_" + remoteClient.RemoteJID + ".json"
 	jsonFile, err := os.Create(path)
 	if err != nil {
+		fmt.Println("Error creating file")
 		fmt.Println(err)
 		return err
 	}
 	defer jsonFile.Close()
 	file, err := json.MarshalIndent(remoteClient.Params, "", " ")
 	if err != nil {
+		fmt.Println("Error marshaling data for writing")
 		fmt.Println(err)
 		return err
 	}
 	err = ioutil.WriteFile(path, file, 0644)
 	if err != nil {
+		fmt.Println("Error writing data to file")
 		fmt.Println(err)
 		return err
 	}
