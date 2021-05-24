@@ -73,7 +73,7 @@
         "name" : "search",
         "commandType" : "Function",
         "toBeSent" : "Go to https://selfregistration.cowin.gov.in/ immediately to book yourself \n*or* \nEnter/type the preferred center ID from the below list to attempt booking by bot\n\n",
-        "errorResponse1" : "No available slots could be found!",
+        "errorResponse1" : "No slot available for Dose 1!",
         "errorResponse2" : "Sorry, OTP could not be generated for authentication.",
         "responseType" : "number",
         "expectedResponse" : "",
@@ -82,7 +82,7 @@
       "otp": {
         "name" : "otp",
         "commandType" : "UserInput",
-        "toBeSent" : "Please enter the OTP received on this mobile number",
+        "toBeSent" : "We have found as many as %d slot(s) for you with total %d doses available.\nPlease enter the OTP received on this mobile number ASAP.",
         "responseType" : "number",
         "expectedResponse" : "",
         "nextCommand": "beneficiaries"

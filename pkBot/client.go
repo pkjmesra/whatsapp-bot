@@ -75,6 +75,8 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 	if cmd.CommandType == "UserInput" {
 		if cmd.Name == "bookanyslot" {
 			cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, remoteClient.Params.District)
+		} else if cmd.Name == "otp" {
+			cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, len(remoteClient.Params.BookingPrefs.PotentialSessions), remoteClient.Params.BookingPrefs.TotalDose1Available)
 		}
 		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
 		updateClient(remoteClient, cmd)
@@ -139,16 +141,7 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 				updateClient(remoteClient, cmd)
 			}
 		} else if lastSent.NextCommand == "beneficiaries" {
-			var beneficiariesList *BeneficiaryList
-			beneficiariesList, err = getBeneficiaries()
-			if err == nil && beneficiariesList.Description != ""{
-				remoteClient.Params.Beneficiaries = beneficiariesList
-				writeUser(remoteClient)
-				cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, beneficiariesList.Description)
-				remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
-				updateClient(remoteClient, cmd)
-				SendResponse(remoteClient, cmd.NextCommand)
-			}
+			getBeneficiariesForRemoteUser(remoteClient, cmd)
 		} else if lastSent.NextCommand == "readcaptcha" {
 			sendCAPTCHA(remoteClient, cmd)
 			updateClient(remoteClient, cmd)
@@ -198,6 +191,23 @@ func sendOTP(remoteClient *RemoteClient, cmd *Command) {
 		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
 		SendResponse(remoteClient, "")
 		return
+	}
+}
+
+func getBeneficiariesForRemoteUser(remoteClient *RemoteClient, cmd *Command){
+	var beneficiariesList *BeneficiaryList
+	var err error
+	beneficiariesList, err = getBeneficiaries()
+	if err == nil && beneficiariesList.Description != ""{
+		eligible, _ := eligibleBeneficiaries(beneficiariesList)
+		beneficiariesList.EligibleCount = len(eligible)
+		remoteClient.Params.Beneficiaries = beneficiariesList
+		remoteClient.Params.BookingPrefs.EligibleCount = len(eligible)
+		writeUser(remoteClient)
+		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, beneficiariesList.Description)
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
+		updateClient(remoteClient, cmd)
+		SendResponse(remoteClient, cmd.NextCommand)
 	}
 }
 
@@ -335,6 +345,7 @@ func resetParams(remoteClient *RemoteClient, shouldReload bool) {
 	remoteClient.Params.Beneficiaries = &BeneficiaryList{}
 	if shouldReload {
 		remoteClient.Params, _ = readUser(remoteClient)
+		remoteClient.Params.OTPTxnDetails = &OTPTxn{}
 	} else {
 		writeUser(remoteClient)
 	}

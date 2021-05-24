@@ -20,22 +20,10 @@ type ApptRequestError struct {
 }
 
 func bookAppointment(beneficiaryList *BeneficiaryList, captcha string, bookingSlot *BookingSlot) (string, error) {
-	beneficiaryId := ""
 	fmt.Fprintf(os.Stderr, "Booking will be attempted for potentials sessions: %d", len(bookingSlot.PotentialSessions))
-	// outer:
-	for _, beneficiary := range beneficiaryList.Beneficiaries {
-		if beneficiary.VaccinationStat == "Not Vaccinated" {
-			if beneficiaryId == "" {
-				beneficiaryId = beneficiary.ReferenceID
-			} else {
-				beneficiaryId = beneficiaryId + "," + beneficiary.ReferenceID
-			}
-			// break outer
-		}
-	}
-	beneficiaries:= strings.Split(beneficiaryId, ",") //make([]string,1)
+	beneficiaries, beneficiaryId := eligibleBeneficiaries(beneficiaryList)
 	var cnf string
-	err := errors.New("Booking failed because no request could be made")
+	err := errors.New("Booking failed because no request could be made (None of the available centers had as many doses left)")
 
 	var potentialSession PotentialSession
 	// postBody := map[string]interface{}{"center_id": , "dose": 1, "captcha": captcha,"session_id": bookingSlot.SessionID, "slot": bookingSlot.Slot, "beneficiaries": beneficiaries}
@@ -75,3 +63,40 @@ func tryBookAppointment(centerId int, captcha, sessionId, slot string, beneficia
 	fmt.Println("AppointmentID confirmed with confirmation ID:" + cnf.ConfirmationId)
 	return cnf.ConfirmationId, nil
 }
+
+func eligibleBeneficiaries(beneficiaryList *BeneficiaryList) ([]string, string) {
+	beneficiaryId := ""
+	for _, beneficiary := range beneficiaryList.Beneficiaries {
+		if beneficiary.VaccinationStat == "Not Vaccinated" {
+			if beneficiaryId == "" {
+				beneficiaryId = beneficiary.ReferenceID
+			} else {
+				beneficiaryId = beneficiaryId + "," + beneficiary.ReferenceID
+			}
+		}
+	}
+	beneficiaries:= strings.Split(beneficiaryId, ",") //make([]string,1)
+	fmt.Fprintf(os.Stderr, "Booking will be attempted for these %d beneficiaries: %s", len(beneficiaries),beneficiaryId)
+	return beneficiaries, beneficiaryId
+}
+
+// func sortSessions(bookingSlot *BookingSlot) {
+// 	sort.Slice(bookingSlot.PotentialSessions, func(s1, s2 PotentialSession) bool {
+// 	    return s1.Dose1Capacity > s2.Dose1Capacity
+// 	})
+// 	if bookingSlot.BookAnySlot {
+// 		for _, potentialSession = range bookingSlot.PotentialSessions {
+// 			if int(potentialSession.Dose1Capacity) >= len(beneficiaries) {
+// 				c := potentialSession.CenterID
+// 				s := potentialSession.SessionID
+// 				sl := potentialSession.Slots[0]
+// 				fmt.Fprintf(os.Stderr, "Booking an appt with centerid:%d, captcha:%s, session:%s, slot:%s, and beneficiaries:%s\n", c, captcha, s, sl, beneficiaryId)
+// 				cnf, err = tryBookAppointment(c,captcha, s, sl, beneficiaries)
+// 				if err == nil && cnf != ""{
+// 					cnf = cnf + "\nCenter:" + potentialSession.CenterName + "\nAddress:" + potentialSession.CenterAddress + "\nSlot:" + sl + "\n"
+// 				}
+// 				break
+// 			}
+// 		}
+// 	}
+// }

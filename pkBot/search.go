@@ -35,6 +35,8 @@ type BookingSlot struct {
 		Slot 		string
 		Description string
 		PotentialSessions []PotentialSession
+		EligibleCount int
+		TotalDose1Available int
 	}
 
 var (
@@ -189,15 +191,16 @@ func getAvailableSessions(response []byte, age int, criteria string, bk *Booking
 	w := tabwriter.NewWriter(&buf, 1, 8, 1, '\t', 0)
 
 	count := 0
+	bk.TotalDose1Available = 0
 	outer:
 	for _, center := range appnts.Centers {
 		for _, s := range center.Sessions {
 			capacity := s.Dose1Capacity
-			// fmt.Fprintf(os.Stderr, "CenterID: %d , AvailableCapacity:%.0f\n", center.CenterID, s.AvailableCapacity)
-			if s.MinAgeLimit <= age && (capacity != 0 ) { //|| s.Dose2Capacity != 0) {
+			fmt.Fprintf(os.Stderr, "CenterID: %d , AvailableCapacity:%.0f, Dose1Capacity:%.0f\n", center.CenterID, s.AvailableCapacity, capacity)
+			if s.MinAgeLimit <= age && (int(capacity) >= bk.EligibleCount ) { //|| s.Dose2Capacity != 0) {
 				if bookingCenterId > 0 {
 					if bookingCenterId == center.CenterID {
-						// fmt.Fprintf(os.Stderr, "AvailableCapacity %.0f for selected center:%d\n", s.AvailableCapacity, center.CenterID)
+						fmt.Fprintf(os.Stderr, "AvailableCapacity %.0f for selected center:%d\n", s.AvailableCapacity, center.CenterID)
 						bk.Preferred = true
 						bk.CenterID = center.CenterID
 						bk.SessionID = s.SessionID
@@ -209,6 +212,7 @@ func getAvailableSessions(response []byte, age int, criteria string, bk *Booking
 				if bk.BookAnySlot && capacity != 0 {
 					fmt.Fprintf(os.Stderr, "CenterID: %d , AvailableCapacity:%.0f, Dose1Capacity:%.0f\n", center.CenterID, s.AvailableCapacity,capacity)
 					s.CenterID = center.CenterID
+					bk.TotalDose1Available = bk.TotalDose1Available + int(capacity)
 					newSession := PotentialSession{CenterID: s.CenterID,
 									CenterName : center.Name,
 									CenterAddress : center.Address,

@@ -41,6 +41,7 @@ type BeneficiaryList struct {
 		} `json:"appointments"`
 	} `json:"beneficiaries"`
 	Description 		string
+	EligibleCount		int
 }
 
 type AppointmentList struct {

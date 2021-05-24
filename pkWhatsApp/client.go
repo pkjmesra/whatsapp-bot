@@ -21,7 +21,7 @@ type WhatsappClient struct {
 
 // NewClient create whatsapp client
 func NewClient() *WhatsappClient {
-	wac, err := whatsapp.NewConn(8 * time.Second)
+	wac, err := whatsapp.NewConn(60 * time.Second)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating connection: %v\n", err)
 		os.Exit(1)
