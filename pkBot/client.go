@@ -153,106 +153,126 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 		resetPollingInterval(remoteClient, globalPollingInterval)
 	}
 	var cmd = evaluateInput(remoteClient, userInput)
-	var err error
 	if cmd.CommandType == "UserInput" {
-		if cmd.Name == "bookanyslot" {
-			cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, remoteClient.Params.District)
-		} else if cmd.Name == "otp" {
-			fmt.Println("Generated OTP for booking. Now sending text to the user to receive OTP.")
-			br := remoteClient.Params.BookingPrefs
-			var centerName string
-			if len(br.PotentialSessions) > 0 {
-				ps := br.PotentialSessions[0]
-				centerName = ps.CenterName
-				if len(br.PotentialSessions) > 1 {
-					centerName = centerName + " and others"
-				}
-			}
-			cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, len(br.PotentialSessions), centerName, br.TotalDose1Available)
-		}
-		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
-		updateClient(remoteClient, cmd)
+		handleUserInputs(remoteClient, cmd)
 	} else if cmd.CommandType == "Function" {
-		lastSent := remoteClient.LastSent
-		if cmd.Name == "book" {
-			fmt.Println("Received booking request for pre-configured data")
-			params := remoteClient.Params
-			if params.State != "" && params.District != "" && params.Age > 0 {
-				fmt.Println("Pre-configured data found")
-				if lastSent.NextCommand == "" {
-					cd := Command{NextCommand:"search"}
-					remoteClient.LastSent = &cd
-				}
-				updateClient(remoteClient, cmd)
-				SendResponse(remoteClient, cmd.NextCommand)
-				return
-			} else {
-				fmt.Println("Restarting because pre-configured data not found")
-				SendResponse(remoteClient, "")
-			}
-			updateClient(remoteClient, cmd)
-			return
-		}
-		if lastSent.NextCommand == "search" {
-			bk, err := Search(remoteClient)
-			if err != nil{
-				fmt.Println("Restarting because error while searching for slots")
-				SendResponse(remoteClient, "")
-			} else {
-				if bk.Description == "" {
-					fmt.Println("Restarting because no slot found from the search")
-					cmd.ToBeSent = cmd.ErrorResponse1
-					remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
-					SendResponse(remoteClient, "")
-					return
-				}
-				if bookingCenterId <= 0 && !remoteClient.Params.BookingPrefs.BookAnySlot {
-					fmt.Println("All slots being shared with user since preferred booking center is not set")
-					remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent + bk.Description)
-				}
-				if (bookingCenterId > 0 || remoteClient.Params.BookingPrefs.BookAnySlot) && bk.Description != "" {
-					fmt.Println("Preferred booking center is set already and center has slots")
-					bk.BookAnySlot = remoteClient.Params.BookingPrefs.BookAnySlot
-					remoteClient.Params.BookingPrefs = bk
-					writeUser(remoteClient)
-					askUserForOTP(remoteClient, cmd)
-				}
-				updateClient(remoteClient, cmd)
-			}
-		} else if cmd.Name == "otpbeneficiary" {
-			generateOTPForToken(remoteClient, cmd)
-		} else if cmd.Name == "beneficiariesupdate" {
-			getBeneficiariesForRemoteUser(remoteClient, cmd, true)
-		} else if lastSent.NextCommand == "beneficiaries" {
-			getBeneficiariesForRemoteUser(remoteClient, cmd, false)
-		} else if lastSent.NextCommand == "readcaptcha" {
-			sendCAPTCHA(remoteClient, cmd)
-			updateClient(remoteClient, cmd)
-		} else if lastSent.NextCommand == "bookingconfirmation" {
-			var cnf string
-			cnf, err = bookAppointment(remoteClient.Params.Beneficiaries, remoteClient.Params.CAPTCHA, remoteClient.Params.BookingPrefs)
-			if err == nil && cnf != "" {
-				if remoteClient.Params.ConfirmationID == "" {
-					remoteClient.Params.ConfirmationID = cnf
-				} else {
-					remoteClient.Params.ConfirmationID = remoteClient.Params.ConfirmationID + "," + cnf
-				}
-				writeUser(remoteClient)
-				cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, cnf)
-				remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
-				updateClient(remoteClient, cmd)
-			} else {
-				cmd.ErrorResponse1 = fmt.Sprintf(cmd.ErrorResponse1, err.Error())
-				remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse1)
-				fmt.Println("Restarting because appointment confirmation failed.")
-				SendResponse(remoteClient, "")
-			}
-			resetPollingInterval(remoteClient, globalPollingInterval)
-		}
+		handleFunctionCommands(remoteClient, cmd)
 	} else {
 		fmt.Println("Restarting because commandtype is neither function nor userInput")
 		SendResponse(remoteClient, "")
 	}
+}
+
+func handleFunctionCommands(remoteClient *RemoteClient, cmd *Command) {
+	lastSent := remoteClient.LastSent
+	if cmd.Name == "book" {
+		handleAdhocBookingRequest(remoteClient, cmd)
+	}
+	if lastSent.NextCommand == "search" {
+		handleSearchRequest(remoteClient, cmd)
+	} else if cmd.Name == "otpbeneficiary" {
+		generateOTPForBearerToken(remoteClient, cmd)
+	} else if cmd.Name == "beneficiariesupdate" {
+		getBeneficiariesForRemoteUser(remoteClient, cmd, true)
+	} else if lastSent.NextCommand == "beneficiaries" {
+		getBeneficiariesForRemoteUser(remoteClient, cmd, false)
+	} else if lastSent.NextCommand == "readcaptcha" {
+		sendCAPTCHA(remoteClient, cmd)
+		updateClient(remoteClient, cmd)
+	} else if lastSent.NextCommand == "bookingconfirmation" {
+		handleBookingRequest(remoteClient, cmd)
+	}
+}
+
+func handleAdhocBookingRequest(remoteClient *RemoteClient, cmd *Command) {
+	fmt.Println("Received booking request for pre-configured data")
+	params := remoteClient.Params
+	if params.State != "" && params.District != "" && params.Age > 0 {
+		fmt.Println("Pre-configured data found")
+		if remoteClient.LastSent.NextCommand == "" {
+			cd := Command{NextCommand:"search"}
+			remoteClient.LastSent = &cd
+		}
+		updateClient(remoteClient, cmd)
+		SendResponse(remoteClient, cmd.NextCommand)
+		return
+	} else {
+		fmt.Println("Restarting because pre-configured data not found")
+		SendResponse(remoteClient, "")
+	}
+	updateClient(remoteClient, cmd)
+	return
+}
+
+func handleSearchRequest(remoteClient *RemoteClient, cmd *Command) {
+	bk, err := Search(remoteClient)
+	if err != nil{
+		fmt.Println("Restarting because error while searching for slots")
+		SendResponse(remoteClient, "")
+	} else {
+		if bk.Description == "" {
+			fmt.Println("Restarting because no slot found from the search")
+			cmd.ToBeSent = cmd.ErrorResponse1
+			remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
+			SendResponse(remoteClient, "")
+			return
+		}
+		if bookingCenterId <= 0 && !remoteClient.Params.BookingPrefs.BookAnySlot {
+			fmt.Println("All slots being shared with user since preferred booking center is not set")
+			remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent + bk.Description)
+		}
+		if (bookingCenterId > 0 || remoteClient.Params.BookingPrefs.BookAnySlot) && bk.Description != "" {
+			fmt.Println("Preferred booking center is set already and center has slots")
+			bk.BookAnySlot = remoteClient.Params.BookingPrefs.BookAnySlot
+			remoteClient.Params.BookingPrefs = bk
+			writeUser(remoteClient)
+			askUserForOTP(remoteClient, cmd)
+		}
+		updateClient(remoteClient, cmd)
+	}
+}
+
+func handleUserInputs(remoteClient *RemoteClient, cmd *Command) {
+	if cmd.Name == "bookanyslot" {
+		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, remoteClient.Params.District)
+	} else if cmd.Name == "otp" {
+		fmt.Println("Generated OTP for booking. Now sending text to the user to receive OTP.")
+		br := remoteClient.Params.BookingPrefs
+		var centerName string
+		if len(br.PotentialSessions) > 0 {
+			ps := br.PotentialSessions[0]
+			centerName = ps.CenterName
+			if len(br.PotentialSessions) > 1 {
+				centerName = centerName + " and others"
+			}
+		}
+		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, len(br.PotentialSessions), centerName, br.TotalDose1Available)
+	}
+	remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
+	updateClient(remoteClient, cmd)
+}
+
+func handleBookingRequest(remoteClient *RemoteClient, cmd *Command) {
+	var cnf string
+	var err error
+	cnf, err = bookAppointment(remoteClient.Params.Beneficiaries, remoteClient.Params.CAPTCHA, remoteClient.Params.BookingPrefs)
+	if err == nil && cnf != "" {
+		if remoteClient.Params.ConfirmationID == "" {
+			remoteClient.Params.ConfirmationID = cnf
+		} else {
+			remoteClient.Params.ConfirmationID = remoteClient.Params.ConfirmationID + "," + cnf
+		}
+		writeUser(remoteClient)
+		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, cnf)
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
+		updateClient(remoteClient, cmd)
+	} else {
+		cmd.ErrorResponse1 = fmt.Sprintf(cmd.ErrorResponse1, err.Error())
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse1)
+		fmt.Println("Restarting because appointment confirmation failed.")
+		SendResponse(remoteClient, "")
+	}
+	resetPollingInterval(remoteClient, globalPollingInterval)
 }
 
 func askUserForOTP(remoteClient *RemoteClient, cmd *Command) {
@@ -275,7 +295,7 @@ func askUserForOTP(remoteClient *RemoteClient, cmd *Command) {
 	}
 }
 
-func generateOTPForToken(remoteClient *RemoteClient, cmd *Command) {
+func generateOTPForBearerToken(remoteClient *RemoteClient, cmd *Command) {
 	var txn *OTPTxn
 	var err error
 	txn, err = generateOTP(remoteClient.RemoteMobileNumber, false)
