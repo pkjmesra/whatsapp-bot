@@ -140,8 +140,12 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 				}
 				updateClient(remoteClient, cmd)
 			}
+		} else if cmd.Name == "otpbeneficiary" {
+			generateOTPForToken(remoteClient, cmd)
+		} else if cmd.Name == "beneficiariesupdate" {
+			getBeneficiariesForRemoteUser(remoteClient, cmd, true)
 		} else if lastSent.NextCommand == "beneficiaries" {
-			getBeneficiariesForRemoteUser(remoteClient, cmd)
+			getBeneficiariesForRemoteUser(remoteClient, cmd, false)
 		} else if lastSent.NextCommand == "readcaptcha" {
 			sendCAPTCHA(remoteClient, cmd)
 			updateClient(remoteClient, cmd)
@@ -171,6 +175,23 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 	}
 }
 
+func generateOTPForToken(remoteClient *RemoteClient, cmd *Command) {
+	var txn *OTPTxn
+	var err error
+	txn, err = generateOTP(remoteClient.RemoteMobileNumber, false)
+	if err == nil && txn.TXNId != "" {
+		remoteClient.Params.OTPTxnDetails = txn
+		writeUser(remoteClient)
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
+		updateClient(remoteClient, cmd)
+		// SendResponse(remoteClient, cmd.NextCommand)
+	} else {
+		fmt.Println("Restarting because failed generating OTP for " + remoteClient.RemoteMobileNumber)
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
+		SendResponse(remoteClient, "")
+	}
+}
+
 func Search(remoteClient *RemoteClient) (*BookingSlot, error) {
 	remoteClient.Params, _ = readUser(remoteClient)
 	params := remoteClient.Params
@@ -194,21 +215,24 @@ func sendOTP(remoteClient *RemoteClient, cmd *Command) {
 	}
 }
 
-func getBeneficiariesForRemoteUser(remoteClient *RemoteClient, cmd *Command){
+func getBeneficiariesForRemoteUser(remoteClient *RemoteClient, cmd *Command, force bool){
 	var beneficiariesList *BeneficiaryList
 	var err error
-	beneficiariesList, err = getBeneficiaries()
-	if err == nil && beneficiariesList.Description != ""{
-		eligible, _ := eligibleBeneficiaries(beneficiariesList)
-		beneficiariesList.EligibleCount = len(eligible)
-		remoteClient.Params.Beneficiaries = beneficiariesList
-		remoteClient.Params.BookingPrefs.EligibleCount = len(eligible)
-		writeUser(remoteClient)
-		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, beneficiariesList.Description)
-		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
-		updateClient(remoteClient, cmd)
-		SendResponse(remoteClient, cmd.NextCommand)
+	savedBeneficiaries := remoteClient.Params.Beneficiaries
+	if force || len(savedBeneficiaries.Beneficiaries) == 0 || savedBeneficiaries.EligibleCount == 0 {
+		beneficiariesList, err = getBeneficiaries()
+		if err == nil && beneficiariesList.Description != ""{
+			eligible, _ := eligibleBeneficiaries(beneficiariesList)
+			beneficiariesList.EligibleCount = len(eligible)
+			remoteClient.Params.Beneficiaries = beneficiariesList
+			remoteClient.Params.BookingPrefs.EligibleCount = len(eligible)
+			writeUser(remoteClient)
+			cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, beneficiariesList.Description)
+			remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
+		}
 	}
+	updateClient(remoteClient, cmd)
+	SendResponse(remoteClient, cmd.NextCommand)
 }
 
 func sendCAPTCHA(remoteClient *RemoteClient, cmd *Command) {
@@ -288,7 +312,7 @@ func processUserInput(remoteClient *RemoteClient) {
 		}
 		if lastSent.Name == "search" && bookingCenterId > 0 && !remoteClient.Params.BookingPrefs.BookAnySlot {
 			nextCmd = "search"
-		} else if lastSent.Name == "otp" && otpTransactionId != "" {
+		} else if (lastSent.Name == "otp" || lastSent.Name == "otpbeneficiary") && otpTransactionId != "" {
 			bearerToken, err = confirmOTP(userInput, remoteClient.Params.OTPTxnDetails.TXNId)
 			if err == nil && bearerToken != "" {
 				remoteClient.Params.OTPTxnDetails.BearerToken = bearerToken
@@ -316,7 +340,7 @@ func saveUserInput(remoteClient *RemoteClient) {
 			remoteClient.Params.Age = age
 			writeUser(remoteClient)
 		}
-	} else if lastSent.Name == "otp" {
+	} else if lastSent.Name == "otp" || lastSent.Name == "otpbeneficiary" {
 		if otp, err := strconv.Atoi(userInput); err == nil {
 			remoteClient.Params.OTP = otp
 			writeUser(remoteClient)
