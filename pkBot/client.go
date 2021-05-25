@@ -32,6 +32,8 @@ type RemoteClient struct {
 	Received 			pkWhatsApp.Message
 	Host				*pkWhatsApp.WhatsappClient
 	Params 	 			*UserParams
+	PollingInterval 	int
+	PollWaitCounter 	int
 }
 
 type UserParams struct {
@@ -53,6 +55,8 @@ func NewClient(msg pkWhatsApp.Message, wac *pkWhatsApp.WhatsappClient) *RemoteCl
 							RemoteJID: msg.From,
 							RemoteMobileNumber: mob,
 							Host: wac,
+							PollingInterval: 0,
+							PollWaitCounter: 0,
 							Received: msg,
 							LastSent: &Command{},
 							LastReceived: pkWhatsApp.Message{},
@@ -75,6 +79,10 @@ func PollServer(interval int, remoteClient *RemoteClient) error {
 	for {
 		select {
 		case <-ticker.C:
+			if pollingRemoteClient != nil && pollingRemoteClient.PollingInterval == defaultSearchInterval && pollingRemoteClient.PollWaitCounter >= 3 {
+				resetPollingInterval(pollingRemoteClient, globalPollingInterval)
+				pollingRemoteClient.PollWaitCounter = 0
+			}
 			fmt.Fprintf(os.Stderr, "Ticker.Tick. Polling every %d seconds\n", globalPollingInterval)
 			if err := CheckSlots(pollingRemoteClient); err != nil {
 				log.Fatalf("Error in CheckSlots(PollServer): %v\n", err)
@@ -92,11 +100,15 @@ func CheckSlots(remoteClient *RemoteClient) error {
 		fmt.Println("RemoteClient is nil")
 		return nil
 	}
-	
+	if remoteClient.LastSent != nil && remoteClient.LastSent.Name == "otp" {
+		Search(remoteClient)
+		remoteClient.PollWaitCounter = remoteClient.PollWaitCounter + 1
+		return nil
+	}
 	bk, _ := Search(remoteClient)
 	if bk.Description != "" { // || debug
 		fmt.Println("Found available slot. Delaying polling now.")
-		resetPollingInterval(defaultSearchInterval)
+		resetPollingInterval(remoteClient, defaultSearchInterval)
 		bk.BookAnySlot = remoteClient.Params.BookingPrefs.BookAnySlot
 		remoteClient.Params.BookingPrefs = bk
 		writeUser(remoteClient)
@@ -109,7 +121,8 @@ func CheckSlots(remoteClient *RemoteClient) error {
 	return nil
 }
 
-func resetPollingInterval(interval int) {
+func resetPollingInterval(remoteClient *RemoteClient, interval int) {
+	remoteClient.PollingInterval = interval
 	fmt.Fprintf(os.Stderr,"Restarting ticker with interval: %d seconds", interval)
 	ticker = time.NewTicker(time.Second * time.Duration(interval))
 }
@@ -137,7 +150,7 @@ func Respond (remoteClient *RemoteClient) {
 func SendResponse(remoteClient *RemoteClient, userInput string) {
 	fmt.Println("Received Response request with userInput:" + userInput)
 	if userInput == "" {
-		resetPollingInterval(globalPollingInterval)
+		resetPollingInterval(remoteClient, globalPollingInterval)
 	}
 	var cmd = evaluateInput(remoteClient, userInput)
 	var err error
@@ -234,7 +247,7 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 				fmt.Println("Restarting because appointment confirmation failed.")
 				SendResponse(remoteClient, "")
 			}
-			resetPollingInterval(globalPollingInterval)
+			resetPollingInterval(remoteClient, globalPollingInterval)
 		}
 	} else {
 		fmt.Println("Restarting because commandtype is neither function nor userInput")
@@ -245,6 +258,7 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 func askUserForOTP(remoteClient *RemoteClient, cmd *Command) {
 	var txn *OTPTxn
 	var err error
+	resetPollingInterval(remoteClient, defaultSearchInterval)
 	fmt.Println("Generating OTP for booking now")
 	txn, err = generateOTP(remoteClient.RemoteMobileNumber, false)
 	if err == nil && txn.TXNId != "" {
@@ -288,22 +302,6 @@ func Search(remoteClient *RemoteClient) (*BookingSlot, error) {
 	return bk, err
 }
 
-func sendOTP(remoteClient *RemoteClient, cmd *Command) {
-	txn, err := generateOTP(remoteClient.RemoteMobileNumber, false)
-	if err == nil && txn.TXNId != "" {
-		remoteClient.Params.OTPTxnDetails = txn
-		writeUser(remoteClient)
-		updateClient(remoteClient, cmd)
-		SendResponse(remoteClient, cmd.NextCommand)
-		return
-	} else {
-		fmt.Println("Restarting because failed generating OTP for " + remoteClient.RemoteMobileNumber)
-		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
-		SendResponse(remoteClient, "")
-		return
-	}
-}
-
 func getBeneficiariesForRemoteUser(remoteClient *RemoteClient, cmd *Command, force bool){
 	var beneficiariesList *BeneficiaryList
 	var err error
@@ -326,6 +324,7 @@ func getBeneficiariesForRemoteUser(remoteClient *RemoteClient, cmd *Command, for
 
 func sendCAPTCHA(remoteClient *RemoteClient, cmd *Command) {
 	fmt.Println("Now sending CAPTCHA request")
+	resetPollingInterval(remoteClient, defaultSearchInterval)
 	fileName := remoteClient.RemoteMobileNumber + "_captcha"
 	err := getCaptchaSVG(fileName + ".svg")
 	var f string
