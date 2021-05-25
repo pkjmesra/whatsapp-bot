@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/pkjmesra/whatsapp-bot/pkBot"
 	"github.com/pkjmesra/whatsapp-bot/pkWhatsApp"
@@ -17,7 +16,7 @@ import (
 var (
 	remoteMobile string
 	thisRemoteClient *pkBot.RemoteClient
-	interval int
+	globalPollingInterval int
 	rootCmd = &cobra.Command{
 		Use:   "cwhatsapp-bot [FLAGS]",
 		Short: "CoWIN Vaccine availability notifier India",
@@ -35,7 +34,7 @@ const (
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&remoteMobile, "remoteMobile", "m", os.Getenv(remoteMobileEnv), "Remote Mobile number")
-	rootCmd.PersistentFlags().IntVarP(&interval, "interval", "i", getIntEnv(searchIntervalEnv), fmt.Sprintf("Interval to repeat the search. Default: (%v) second", defaultSearchInterval))
+	rootCmd.PersistentFlags().IntVarP(&globalPollingInterval, "interval", "i", getIntEnv(searchIntervalEnv), fmt.Sprintf("Interval to repeat the search. Default: (%v) second", defaultSearchInterval))
 }
 
 // Execute executes the main command
@@ -72,6 +71,7 @@ func addNewRemoteClient(m map[string]*pkBot.RemoteClient, msg pkWhatsApp.Message
     fmt.Println("RemoteJID set to:" + rc.RemoteJID)
     pkBot.Respond(rc)
     thisRemoteClient = rc
+    pkBot.UpdateRemoteClient(rc)
     return rc
 }
 
@@ -96,30 +96,9 @@ func Run(args []string) error {
 	defer logfile.Close()
 	log.SetOutput(logfile)
 
-	if err := checkSlots(); err != nil {
-		return err
-	}
-	ticker := time.NewTicker(time.Second * time.Duration(interval))
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			if err := checkSlots(); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func checkSlots() error {
-	// Search for slots
-	if thisRemoteClient == nil {
-		return nil
-	}
-	bk, err := pkBot.Search(thisRemoteClient)
-	if bk.Description != "" { // || debug 
-		pkBot.SendResponse(thisRemoteClient, "book")
-	}
-	return err
+	// if err := pkBot.CheckSlots(thisRemoteClient); err != nil {
+	// 	log.Fatalf("error in CheckSlots: %v", err)
+	// 	return err
+	// }
+	return pkBot.PollServer(globalPollingInterval, thisRemoteClient)
 }

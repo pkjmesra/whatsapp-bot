@@ -196,7 +196,9 @@ func getAvailableSessions(response []byte, age int, criteria string, bk *Booking
 	for _, center := range appnts.Centers {
 		for _, s := range center.Sessions {
 			capacity := s.Dose1Capacity
-			fmt.Fprintf(os.Stderr, "CenterID: %d , AvailableCapacity:%.0f, Dose1Capacity:%.0f\n", center.CenterID, s.AvailableCapacity, capacity)
+			if s.AvailableCapacity > 0 {
+				fmt.Fprintf(os.Stderr, "CenterID: %d , AvailableCapacity:%.0f, Dose1Capacity (%d years):%.0f\n", center.CenterID, s.AvailableCapacity, s.MinAgeLimit, capacity)
+			}
 			if s.MinAgeLimit <= age && (int(capacity) >= bk.EligibleCount ) { //|| s.Dose2Capacity != 0) {
 				if bookingCenterId > 0 {
 					if bookingCenterId == center.CenterID {

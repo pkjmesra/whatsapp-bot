@@ -2,11 +2,25 @@ package pkBot
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
-	
+	"time"
+
 	"github.com/pkjmesra/whatsapp-bot/pkWhatsApp"
+)
+
+var (
+	globalPollingInterval int
+	lastPollingInterval int
+	pollingRemoteClient *RemoteClient
+	ticker *time.Ticker
+	bookingInProgress bool
+)
+
+const (
+	defaultSearchInterval 	= 60
 )
 
 // Remote WhatsappClient who's trying to communicate
@@ -48,6 +62,59 @@ func NewClient(msg pkWhatsApp.Message, wac *pkWhatsApp.WhatsappClient) *RemoteCl
 	return &rc
 }
 
+func UpdateRemoteClient(remoteClient *RemoteClient) {
+	if pollingRemoteClient == nil {
+		pollingRemoteClient = remoteClient
+	}
+}
+
+func PollServer(interval int, remoteClient *RemoteClient) error {
+	fmt.Fprintf(os.Stderr, "Polling every %d seconds\n", interval)
+	globalPollingInterval = interval
+	ticker = time.NewTicker(time.Second * time.Duration(globalPollingInterval))
+	for {
+		select {
+		case <-ticker.C:
+			fmt.Fprintf(os.Stderr, "Ticker.Tick. Polling every %d seconds\n", globalPollingInterval)
+			if err := CheckSlots(pollingRemoteClient); err != nil {
+				log.Fatalf("Error in CheckSlots(PollServer): %v\n", err)
+				return err
+			}
+		}
+	}
+	fmt.Println("stopping ticker...")
+	return nil
+}
+
+func CheckSlots(remoteClient *RemoteClient) error {
+	// Search for slots
+	if remoteClient == nil {
+		fmt.Println("RemoteClient is nil")
+		return nil
+	}
+	bk, _ := Search(remoteClient)
+	if bk.Description != "" { // || debug
+		fmt.Println("Found available slot. Delaying polling now.")
+		ticker.Stop()
+		lastPollingInterval = globalPollingInterval
+		globalPollingInterval = defaultSearchInterval
+		ticker = time.NewTicker(time.Second * time.Duration(globalPollingInterval))
+		SendResponse(remoteClient, "book")
+	} else {
+		fmt.Println("No results from search")
+	}
+	return nil
+}
+
+func resetPollingInterval(remoteClient *RemoteClient) {
+	ticker.Stop()
+	fmt.Fprintf(os.Stderr, "Polling every %d seconds\n", globalPollingInterval)
+	globalPollingInterval = lastPollingInterval
+	fmt.Fprintf(os.Stderr, "Resetting Polling to %d seconds\n", lastPollingInterval)
+	fmt.Fprintf(os.Stderr, "Polling every %d seconds\n", globalPollingInterval)
+	PollServer(globalPollingInterval, remoteClient)
+}
+
 func Respond (remoteClient *RemoteClient) {
 	message := remoteClient.Received.Source
 	userInput := strings.ToLower(remoteClient.Received.Text)
@@ -76,7 +143,17 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 		if cmd.Name == "bookanyslot" {
 			cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, remoteClient.Params.District)
 		} else if cmd.Name == "otp" {
-			cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, len(remoteClient.Params.BookingPrefs.PotentialSessions), remoteClient.Params.BookingPrefs.TotalDose1Available)
+			fmt.Println("Generated OTP for booking. Now sending text to the user to receive OTP.")
+			br := remoteClient.Params.BookingPrefs
+			var centerName string
+			if len(br.PotentialSessions) > 0 {
+				ps := br.PotentialSessions[0]
+				centerName = ps.CenterName
+				if len(br.PotentialSessions) > 1 {
+					centerName = centerName + " and others"
+				}
+			}
+			cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, len(br.PotentialSessions), centerName, br.TotalDose1Available)
 		}
 		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
 		updateClient(remoteClient, cmd)
@@ -124,6 +201,7 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 					remoteClient.Params.BookingPrefs = bk
 					writeUser(remoteClient)
 					var txn *OTPTxn
+					fmt.Println("Generating OTP for booking now")
 					txn, err = generateOTP(remoteClient.RemoteMobileNumber, false)
 					if err == nil && txn.TXNId != "" {
 						remoteClient.Params.OTPTxnDetails = txn
@@ -168,6 +246,7 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 				fmt.Println("Restarting because appointment confirmation failed.")
 				SendResponse(remoteClient, "")
 			}
+			resetPollingInterval(remoteClient)
 		}
 	} else {
 		fmt.Println("Restarting because commandtype is neither function nor userInput")
@@ -381,3 +460,4 @@ func updateClient(remoteClient *RemoteClient, cmd *Command) {
 	remoteClient.Received = pkWhatsApp.Message{}
 	fmt.Fprintf(os.Stderr, "LastSent: \n{Name: %s, NextCmd: %s}\n", cmd.Name, cmd.NextCommand)
 }
+

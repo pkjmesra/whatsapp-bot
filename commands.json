@@ -99,7 +99,7 @@
       "otp": {
         "name" : "otp",
         "commandType" : "UserInput",
-        "toBeSent" : "We have found as many as %d slot(s) for you with total %d doses available.\nPlease enter the OTP received on this mobile number ASAP.",
+        "toBeSent" : "We have found as many as *%d* slot(s) for you at *%s*, with total *%d* doses available.\nPlease enter the OTP received on this mobile number ASAP.",
         "responseType" : "number",
         "expectedResponse" : "",
         "nextCommand": "beneficiaries"

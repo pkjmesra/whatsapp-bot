@@ -93,8 +93,8 @@ func queryServer(path string, method string, jsonBody map[string]interface{}) ([
 	requestDump, err := httputil.DumpRequest(req, jsonBody != nil)
 	if err != nil {
 	  fmt.Println(err)
+	  fmt.Println(string(requestDump))
 	}
-	fmt.Println(string(requestDump))
 
 	var netClient = &http.Client{
 	  Timeout: time.Second * 30,
