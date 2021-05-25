@@ -2,6 +2,7 @@
 Whatsapp Bot for CoWIN vaccination.
 
 ![WhatsApp Icon](https://cdn.icon-icons.com/icons2/373/PNG/96/Whatsapp_37229.png)
+![CoWIN Icon](https://prod-cdn.preprod.co-vin.in/assets/images/covid19logo.jpg)
 
 ## Install
 
