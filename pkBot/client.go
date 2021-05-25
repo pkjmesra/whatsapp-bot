@@ -82,7 +82,7 @@ func PollServer(interval int, remoteClient *RemoteClient) error {
 			}
 		}
 	}
-	fmt.Println("stopping ticker...")
+	fmt.Println("Stopped ticker.")
 	return nil
 }
 
@@ -92,27 +92,26 @@ func CheckSlots(remoteClient *RemoteClient) error {
 		fmt.Println("RemoteClient is nil")
 		return nil
 	}
+	
 	bk, _ := Search(remoteClient)
 	if bk.Description != "" { // || debug
 		fmt.Println("Found available slot. Delaying polling now.")
-		ticker.Stop()
-		lastPollingInterval = globalPollingInterval
-		globalPollingInterval = defaultSearchInterval
-		ticker = time.NewTicker(time.Second * time.Duration(globalPollingInterval))
-		SendResponse(remoteClient, "book")
+		resetPollingInterval(defaultSearchInterval)
+		bk.BookAnySlot = remoteClient.Params.BookingPrefs.BookAnySlot
+		remoteClient.Params.BookingPrefs = bk
+		writeUser(remoteClient)
+		var cmd = evaluateInput(remoteClient, "search")
+		remoteClient.LastSent = cmd
+		askUserForOTP(remoteClient, cmd)
 	} else {
 		fmt.Println("No results from search")
 	}
 	return nil
 }
 
-func resetPollingInterval(remoteClient *RemoteClient) {
-	ticker.Stop()
-	fmt.Fprintf(os.Stderr, "Polling every %d seconds\n", globalPollingInterval)
-	globalPollingInterval = lastPollingInterval
-	fmt.Fprintf(os.Stderr, "Resetting Polling to %d seconds\n", lastPollingInterval)
-	fmt.Fprintf(os.Stderr, "Polling every %d seconds\n", globalPollingInterval)
-	PollServer(globalPollingInterval, remoteClient)
+func resetPollingInterval(interval int) {
+	fmt.Fprintf(os.Stderr,"Restarting ticker with interval: %d seconds", interval)
+	ticker = time.NewTicker(time.Second * time.Duration(interval))
 }
 
 func Respond (remoteClient *RemoteClient) {
@@ -137,6 +136,9 @@ func Respond (remoteClient *RemoteClient) {
 
 func SendResponse(remoteClient *RemoteClient, userInput string) {
 	fmt.Println("Received Response request with userInput:" + userInput)
+	if userInput == "" {
+		resetPollingInterval(globalPollingInterval)
+	}
 	var cmd = evaluateInput(remoteClient, userInput)
 	var err error
 	if cmd.CommandType == "UserInput" {
@@ -200,21 +202,7 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 					bk.BookAnySlot = remoteClient.Params.BookingPrefs.BookAnySlot
 					remoteClient.Params.BookingPrefs = bk
 					writeUser(remoteClient)
-					var txn *OTPTxn
-					fmt.Println("Generating OTP for booking now")
-					txn, err = generateOTP(remoteClient.RemoteMobileNumber, false)
-					if err == nil && txn.TXNId != "" {
-						remoteClient.Params.OTPTxnDetails = txn
-						writeUser(remoteClient)
-						updateClient(remoteClient, cmd)
-						SendResponse(remoteClient, cmd.NextCommand)
-						return
-					} else {
-						fmt.Println("Restarting because failed generating OTP for " + remoteClient.RemoteMobileNumber)
-						remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
-						SendResponse(remoteClient, "")
-						return
-					}
+					askUserForOTP(remoteClient, cmd)
 				}
 				updateClient(remoteClient, cmd)
 			}
@@ -246,11 +234,30 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 				fmt.Println("Restarting because appointment confirmation failed.")
 				SendResponse(remoteClient, "")
 			}
-			resetPollingInterval(remoteClient)
+			resetPollingInterval(globalPollingInterval)
 		}
 	} else {
 		fmt.Println("Restarting because commandtype is neither function nor userInput")
 		SendResponse(remoteClient, "")
+	}
+}
+
+func askUserForOTP(remoteClient *RemoteClient, cmd *Command) {
+	var txn *OTPTxn
+	var err error
+	fmt.Println("Generating OTP for booking now")
+	txn, err = generateOTP(remoteClient.RemoteMobileNumber, false)
+	if err == nil && txn.TXNId != "" {
+		remoteClient.Params.OTPTxnDetails = txn
+		writeUser(remoteClient)
+		updateClient(remoteClient, cmd)
+		SendResponse(remoteClient, cmd.NextCommand)
+		return
+	} else {
+		fmt.Println("Restarting because failed generating OTP for " + remoteClient.RemoteMobileNumber)
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
+		SendResponse(remoteClient, "")
+		return
 	}
 }
 
@@ -275,6 +282,9 @@ func Search(remoteClient *RemoteClient) (*BookingSlot, error) {
 	remoteClient.Params, _ = readUser(remoteClient)
 	params := remoteClient.Params
 	bk, err := searchByStateDistrict(params.Age, params.State, params.District, remoteClient.Params.BookingPrefs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr,"(Search)Error while searching for slots:%v\n", err)
+	}
 	return bk, err
 }
 
