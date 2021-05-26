@@ -437,7 +437,7 @@ func processUserInput(remoteClient *RemoteClient) {
 func saveUserInput(remoteClient *RemoteClient) {
 	var userInput = remoteClient.Received.Text
 	var lastSent = remoteClient.LastSent
-	if lastSent.Name == "vaccine" {
+	if lastSent.Name == "vaccine" || lastSent.Name == "state" {
 		remoteClient.Params.State = userInput
 		writeUser(remoteClient)
 	} else if lastSent.Name == "district" {
