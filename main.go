@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkjmesra/whatsapp-bot/pkBot"
 	"github.com/pkjmesra/whatsapp-bot/pkWhatsApp"
@@ -15,8 +16,8 @@ import (
 
 var (
 	remoteMobile string
-	thisRemoteClient *pkBot.RemoteClient
 	globalPollingInterval int
+	globalTicker *time.Ticker
 	rootCmd = &cobra.Command{
 		Use:   "cwhatsapp-bot [FLAGS]",
 		Short: "CoWIN Vaccine availability notifier India",
@@ -44,35 +45,25 @@ func Execute() error {
 }
 
 func main() {
-	remoteClients := make(map[string]*pkBot.RemoteClient)
 	client := pkWhatsApp.NewClient()
 	pkBot.Initialize()
 	client.Listen(func(msg pkWhatsApp.Message) {
 		// Only handle messages to self or one-on-one messages to the registered WhatsApp number
 		if strings.Contains(msg.From, "@c.us") || strings.Contains(msg.From, "@s.whatsapp.net") {
-			addNewRemoteClient(remoteClients, msg, client)
+			addNewRemoteClient(msg, client)
 		} else if strings.Contains(msg.From, "@g.us"){
 			// Ignore the messages in group
-			fmt.Println("Message Received -> ID : " + msg.From + " : Message:" + msg.Text)
+			fmt.Println("Message Received (and ignored) -> ID : " + msg.From + " : Message:" + msg.Text)
 		}
 	})
 	Execute()
 }
 
-func addNewRemoteClient(m map[string]*pkBot.RemoteClient, msg pkWhatsApp.Message, wac *pkWhatsApp.WhatsappClient) *pkBot.RemoteClient {
-    rc := m[msg.From]
-    if rc == nil {
-        m[msg.From] = pkBot.NewClient(msg, wac)
-        rc = m[msg.From]
-    }
-    rc.Received = msg
-    rc.RemoteJID = remoteMobile + "@s.whatsapp.net"
-    rc.RemoteMobileNumber = remoteMobile
-    fmt.Println("RemoteJID set to:" + rc.RemoteJID)
-    pkBot.Respond(rc)
-    thisRemoteClient = rc
-    pkBot.UpdateRemoteClient(rc)
-    return rc
+func addNewRemoteClient(msg pkWhatsApp.Message, wac *pkWhatsApp.WhatsappClient) *pkBot.RemoteClient {
+    remoteClient := pkBot.GetClient(msg, wac)
+    remoteClient.Received = msg
+    pkBot.Respond(remoteClient)
+    return remoteClient
 }
 
 func getIntEnv(envVar string) int {
@@ -96,9 +87,22 @@ func Run(args []string) error {
 	defer logfile.Close()
 	log.SetOutput(logfile)
 
-	// if err := pkBot.CheckSlots(thisRemoteClient); err != nil {
-	// 	log.Fatalf("error in CheckSlots: %v", err)
-	// 	return err
-	// }
-	return pkBot.PollServer(globalPollingInterval, thisRemoteClient)
+	clients := pkBot.Clients()
+	prevCount := len(clients)
+	pkBot.BeginPollingForClients(globalPollingInterval)
+	globalTicker = time.NewTicker(time.Second * time.Duration(defaultSearchInterval))
+	for {
+		select {
+		case <-globalTicker.C:
+			newClients := pkBot.Clients()
+			newCount := len(newClients)
+			if prevCount != newCount {
+				// New client got added or old client got removed
+				fmt.Fprintf(os.Stderr, "GlobalTicker.Tick. Polling for %d client now\n", len(clients))
+				pkBot.BeginPollingForClients(globalPollingInterval)
+			}
+		}
+	}
+	fmt.Println("Stopped Global ticker.")
+	return nil
 }

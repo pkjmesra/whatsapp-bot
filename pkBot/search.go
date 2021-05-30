@@ -42,7 +42,7 @@ type BookingSlot struct {
 var (
 	slotsAvailable bool
 	bookingSlot *BookingSlot
-	age, pinCode, bookingCenterId, stateID, districtID int
+	pinCode, bookingCenterId int
 )
 
 type StateList struct {
@@ -104,13 +104,13 @@ func timeNow() string {
 	return time.Now().Format("02-01-2006")
 }
 
-func searchByPincode(pinCode string) (*BookingSlot, error) {
-	bk := BookingSlot{Available:false}
+func searchByPincode(remoteClient *RemoteClient, pinCode string) (*BookingSlot, error) {
+	bk := remoteClient.Params.BookingPrefs
 	response, err := queryServer(fmt.Sprintf(calendarByPinURLFormat, pinCode, timeNow()), "GET", nil)
 	if err != nil {
-		return &bk, errors.Wrap(err, "Failed to fetch appointment sessions")
+		return bk, errors.Wrap(err, "Failed to fetch appointment sessions")
 	}
-	return getAvailableSessions(response, age, pinCode, &bk)
+	return getAvailableSessions(response, remoteClient.Params.Age, pinCode, bk)
 }
 
 func getStateIDByName(state string) (int, error) {
@@ -149,29 +149,30 @@ func getDistrictIDByName(stateID int, district string) (int, error) {
 	return 0, errors.New("Invalid district name passed")
 }
 
-func searchByStateDistrict(age int, state, district string, bk *BookingSlot) (*BookingSlot, error) {
+func searchByStateDistrict(remoteClient *RemoteClient) (*BookingSlot, error) {
 	var err1 error
-	// bk := BookingSlot{Available:false}
-	if stateID == 0 {
-		stateID, err1 = getStateIDByName(state)
+	params := remoteClient.Params
+	bk := params.BookingPrefs
+	if params.StateID == 0 {
+		params.StateID, err1 = getStateIDByName(params.State)
 		if err1 != nil {
 			return bk, err1
 		}
 	}
-	if districtID == 0 {
-		districtID, err1 = getDistrictIDByName(stateID, district)
+	if params.DistrictID == 0 {
+		params.DistrictID, err1 = getDistrictIDByName(params.StateID, params.District)
 		if err1 != nil {
 			return bk, err1
 		}
 	}
-	fmt.Fprintf(os.Stderr, "Searching with age:%d, state:%s, district:%s\n", age, state, district)
-	response, err := queryServer(fmt.Sprintf(calendarByDistrictURLFormat, districtID, timeNow()), "GET", nil)
+	fmt.Fprintf(os.Stderr, remoteClient.RemoteJID + ":Searching with age:%d, state:%s, district:%s\n", params.Age, params.State, params.District)
+	response, err := queryServer(fmt.Sprintf(calendarByDistrictURLFormat, params.DistrictID, timeNow()), "GET", nil)
 	if err != nil {
 		return bk, errors.Wrap(err, "Failed to fetch appointment sessions")
 	}
-	var criteria = state + "," + district
+	var criteria = params.State + "," + params.District
 	// var ck *BookingSlot
-	bk, err = getAvailableSessions(response, age, criteria, bk)
+	bk, err = getAvailableSessions(response, params.Age, criteria, bk)
 	return bk, err
 }
 
@@ -200,8 +201,8 @@ func getAvailableSessions(response []byte, age int, criteria string, bk *Booking
 				fmt.Fprintf(os.Stderr, "CenterID: %d , AvailableCapacity:%.0f, Dose1Capacity (%d years):%.0f\n", center.CenterID, s.AvailableCapacity, s.MinAgeLimit, capacity)
 			}
 			if s.MinAgeLimit <= age && (int(capacity) >= bk.EligibleCount ) { //|| s.Dose2Capacity != 0) {
-				if bookingCenterId > 0 {
-					if bookingCenterId == center.CenterID {
+				if bk.CenterID > 0 {
+					if bk.CenterID == center.CenterID {
 						fmt.Fprintf(os.Stderr, "AvailableCapacity %.0f for selected center:%d\n", s.AvailableCapacity, center.CenterID)
 						bk.Preferred = true
 						bk.CenterID = center.CenterID
@@ -229,7 +230,7 @@ func getAvailableSessions(response []byte, age int, criteria string, bk *Booking
 					bk.PotentialSessions = append(bk.PotentialSessions, newSession)
 					fmt.Fprintf(os.Stderr, "New Potential Session added. Total Count:%d\n", len(bk.PotentialSessions))
 				}
-				if (bk.Preferred || bookingCenterId <= 0 || bk.BookAnySlot) && capacity != 0 {
+				if (bk.Preferred || bk.CenterID <= 0 || bk.BookAnySlot) && capacity != 0 {
 					count++
 					fmt.Fprintln(w, fmt.Sprintf("*(%d). Center\t  %s, %s, %s, %s, %d*", count, center.Name, center.Address, center.DistrictName, center.StateName, center.Pincode))
 					fmt.Fprintln(w, fmt.Sprintf("Fee\t  %s", center.FeeType))

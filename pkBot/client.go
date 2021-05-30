@@ -2,25 +2,12 @@ package pkBot
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/pkjmesra/whatsapp-bot/pkWhatsApp"
-)
-
-var (
-	globalPollingInterval int
-	lastPollingInterval int
-	pollingRemoteClient *RemoteClient
-	ticker *time.Ticker
-	bookingInProgress bool
-)
-
-const (
-	defaultSearchInterval 	= 60
 )
 
 // Remote WhatsappClient who's trying to communicate
@@ -39,6 +26,8 @@ type RemoteClient struct {
 type UserParams struct {
 	State 			string
 	District		string
+	StateID 		int
+	DistrictID		int
 	Age				int
 	OTP 			int
 	OTPTxnDetails 	*OTPTxn
@@ -67,59 +56,31 @@ func NewClient(msg pkWhatsApp.Message, wac *pkWhatsApp.WhatsappClient) *RemoteCl
 }
 
 func Respond (remoteClient *RemoteClient) {
-	message := remoteClient.Received.Source
+	// message := remoteClient.Received.Source
 	userInput := strings.ToLower(remoteClient.Received.Text)
-	if message.Info.FromMe || remoteClient.RemoteJID == remoteClient.RemoteMobileNumber + "@s.whatsapp.net" {
-		lastSent := remoteClient.LastSent
-		if userInput == "vaccine" || userInput == "book" {
-			remoteClient.Params, _ = readUser(remoteClient)
-			SendResponse(remoteClient, userInput)
-		} else if userInput == "certificate" {
-			SendResponse(remoteClient, userInput)
-		} else if lastSent.Name == "" {
-			fmt.Println("Restarting because lastsent.Name is empty")
-			SendResponse(remoteClient, "")
-		} else {
-			saveUserInput(remoteClient)
-			processUserInput(remoteClient)
-		}
+	// if message.Info.FromMe || remoteClient.RemoteJID == remoteClient.RemoteMobileNumber + "@s.whatsapp.net" {
+	lastSent := remoteClient.LastSent
+	if userInput == "vaccine" || userInput == "book" {
+		remoteClient.Params, _ = readUser(remoteClient)
+		SendResponse(remoteClient, userInput)
+	} else if userInput == "certificate" {
+		SendResponse(remoteClient, userInput)
+	} else if lastSent.Name == "" {
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because lastsent.Name is empty")
+		SendResponse(remoteClient, "")
 	} else {
-		// remoteClient.Host.SendText(remoteClient.RemoteJID, "Hello from *github*!")
+		saveUserInput(remoteClient)
+		processUserInput(remoteClient)
 	}
-}
-
-func UpdateRemoteClient(remoteClient *RemoteClient) {
-	if pollingRemoteClient == nil {
-		pollingRemoteClient = remoteClient
-	}
-}
-
-func PollServer(interval int, remoteClient *RemoteClient) error {
-	fmt.Fprintf(os.Stderr, "Polling every %d seconds\n", interval)
-	globalPollingInterval = interval
-	ticker = time.NewTicker(time.Second * time.Duration(globalPollingInterval))
-	for {
-		select {
-		case <-ticker.C:
-			if pollingRemoteClient != nil && pollingRemoteClient.PollingInterval == defaultSearchInterval && pollingRemoteClient.PollWaitCounter >= 3 {
-				resetPollingInterval(pollingRemoteClient, globalPollingInterval)
-				pollingRemoteClient.PollWaitCounter = 0
-			}
-			fmt.Fprintf(os.Stderr, "Ticker.Tick. Polling every %d seconds\n", globalPollingInterval)
-			if err := CheckSlots(pollingRemoteClient); err != nil {
-				log.Fatalf("Error in CheckSlots(PollServer): %v\n", err)
-				return err
-			}
-		}
-	}
-	fmt.Println("Stopped ticker.")
-	return nil
+	// } else {
+	// 	// remoteClient.Host.SendText(remoteClient.RemoteJID, "Hello from *github*!")
+	// }
 }
 
 func CheckSlots(remoteClient *RemoteClient) error {
 	// Search for slots
 	if remoteClient == nil {
-		fmt.Println("RemoteClient is nil")
+		fmt.Println(remoteClient.RemoteJID + ":RemoteClient is nil")
 		return nil
 	}
 	if remoteClient.LastSent != nil && remoteClient.LastSent.Name == "otp" {
@@ -129,7 +90,7 @@ func CheckSlots(remoteClient *RemoteClient) error {
 	}
 	bk, _ := Search(remoteClient)
 	if bk.Description != "" { // || debug
-		fmt.Println("Found available slot. Delaying polling now.")
+		fmt.Println(remoteClient.RemoteJID + ":Found available slot. Delaying polling now.")
 		resetPollingInterval(remoteClient, defaultSearchInterval)
 		bk.BookAnySlot = remoteClient.Params.BookingPrefs.BookAnySlot
 		remoteClient.Params.BookingPrefs = bk
@@ -138,19 +99,19 @@ func CheckSlots(remoteClient *RemoteClient) error {
 		remoteClient.LastSent = cmd
 		askUserForOTP(remoteClient, cmd)
 	} else {
-		fmt.Println("No results from search")
+		fmt.Println(remoteClient.RemoteJID + ":No results from search")
 	}
 	return nil
 }
 
 func resetPollingInterval(remoteClient *RemoteClient, interval int) {
 	remoteClient.PollingInterval = interval
-	fmt.Fprintf(os.Stderr,"Restarting ticker with interval: %d seconds", interval)
+	fmt.Fprintf(os.Stderr,remoteClient.RemoteJID + ":Restarting ticker with interval: %d seconds\n", interval)
 	ticker = time.NewTicker(time.Second * time.Duration(interval))
 }
 
 func SendResponse(remoteClient *RemoteClient, userInput string) {
-	fmt.Println("Received Response request with userInput:" + userInput)
+	fmt.Println(remoteClient.RemoteJID + ":Received Response request with userInput:" + userInput)
 	if userInput == "" {
 		resetPollingInterval(remoteClient, globalPollingInterval)
 	}
@@ -160,7 +121,7 @@ func SendResponse(remoteClient *RemoteClient, userInput string) {
 	} else if cmd.CommandType == "Function" {
 		handleFunctionCommands(remoteClient, cmd)
 	} else {
-		fmt.Println("Restarting because commandtype is neither function nor userInput")
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because commandtype is neither function nor userInput")
 		SendResponse(remoteClient, "")
 	}
 }
@@ -191,10 +152,10 @@ func handleFunctionCommands(remoteClient *RemoteClient, cmd *Command) {
 }
 
 func downloadcertificate(remoteClient *RemoteClient, cmd *Command) {
-	fmt.Println("Now downloading certificate")
+	fmt.Println(remoteClient.RemoteJID + ":Now downloading certificate")
 	response, err := queryServer(certificateURLFormat, "GET", nil)
 	if err != nil {
-		fmt.Println("Restarting because failed getting certificate for " + remoteClient.RemoteMobileNumber)
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because failed getting certificate for " + remoteClient.RemoteMobileNumber)
 		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
 		return
 	} else {
@@ -207,15 +168,15 @@ func downloadcertificate(remoteClient *RemoteClient, cmd *Command) {
 		if err != nil {
 		 	fmt.Println(err)
 		}
-		fmt.Println("Certificate data saved into :" + os.TempDir() + "Anubhav.pdf")
+		fmt.Println(remoteClient.RemoteJID + ":Certificate data saved into :" + os.TempDir() + "Anubhav.pdf")
 	}
 }
 
 func handleAdhocBookingRequest(remoteClient *RemoteClient, cmd *Command) {
-	fmt.Println("Received booking request for pre-configured data")
+	fmt.Println(remoteClient.RemoteJID + ":Received booking request for pre-configured data")
 	params := remoteClient.Params
 	if params.State != "" && params.District != "" && params.Age > 0 {
-		fmt.Println("Pre-configured data found")
+		fmt.Println(remoteClient.RemoteJID + ":Pre-configured data found")
 		if remoteClient.LastSent.NextCommand == "" {
 			cd := Command{NextCommand:"search"}
 			remoteClient.LastSent = &cd
@@ -224,7 +185,7 @@ func handleAdhocBookingRequest(remoteClient *RemoteClient, cmd *Command) {
 		SendResponse(remoteClient, cmd.NextCommand)
 		return
 	} else {
-		fmt.Println("Restarting because pre-configured data not found")
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because pre-configured data not found")
 		SendResponse(remoteClient, "")
 	}
 	updateClient(remoteClient, cmd)
@@ -234,22 +195,22 @@ func handleAdhocBookingRequest(remoteClient *RemoteClient, cmd *Command) {
 func handleSearchRequest(remoteClient *RemoteClient, cmd *Command) {
 	bk, err := Search(remoteClient)
 	if err != nil{
-		fmt.Println("Restarting because error while searching for slots")
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because error while searching for slots")
 		SendResponse(remoteClient, "")
 	} else {
 		if bk.Description == "" {
-			fmt.Println("Restarting because no slot found from the search")
+			fmt.Println(remoteClient.RemoteJID + ":Restarting because no slot found from the search")
 			cmd.ToBeSent = cmd.ErrorResponse1
 			remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
 			SendResponse(remoteClient, "")
 			return
 		}
 		if bookingCenterId <= 0 && !remoteClient.Params.BookingPrefs.BookAnySlot {
-			fmt.Println("All slots being shared with user since preferred booking center is not set")
+			fmt.Println(remoteClient.RemoteJID + ":All slots being shared with user since preferred booking center is not set")
 			remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent + bk.Description)
 		}
 		if (bookingCenterId > 0 || remoteClient.Params.BookingPrefs.BookAnySlot) && bk.Description != "" {
-			fmt.Println("Preferred booking center is set already and center has slots")
+			fmt.Println(remoteClient.RemoteJID + ":Preferred booking center is set already and center has slots")
 			bk.BookAnySlot = remoteClient.Params.BookingPrefs.BookAnySlot
 			remoteClient.Params.BookingPrefs = bk
 			writeUser(remoteClient)
@@ -263,7 +224,7 @@ func handleUserInputs(remoteClient *RemoteClient, cmd *Command) {
 	if cmd.Name == "bookanyslot" {
 		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, remoteClient.Params.District)
 	} else if cmd.Name == "otp" {
-		fmt.Println("Generated OTP for booking. Now sending text to the user to receive OTP.")
+		fmt.Println(remoteClient.RemoteJID + ":Generated OTP for booking. Now sending text to the user to receive OTP.")
 		br := remoteClient.Params.BookingPrefs
 		var centerName string
 		if len(br.PotentialSessions) > 0 {
@@ -296,7 +257,7 @@ func handleBookingRequest(remoteClient *RemoteClient, cmd *Command) {
 	} else {
 		cmd.ErrorResponse1 = fmt.Sprintf(cmd.ErrorResponse1, err.Error())
 		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse1)
-		fmt.Println("Restarting because appointment confirmation failed.")
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because appointment confirmation failed.")
 		SendResponse(remoteClient, "")
 	}
 	resetPollingInterval(remoteClient, globalPollingInterval)
@@ -306,7 +267,7 @@ func askUserForOTP(remoteClient *RemoteClient, cmd *Command) {
 	var txn *OTPTxn
 	var err error
 	resetPollingInterval(remoteClient, defaultSearchInterval)
-	fmt.Println("Generating OTP for booking now")
+	fmt.Println(remoteClient.RemoteJID + ":Generating OTP for booking now")
 	txn, err = generateOTP(remoteClient.RemoteMobileNumber, false)
 	if err == nil && txn.TXNId != "" {
 		remoteClient.Params.OTPTxnDetails = txn
@@ -315,7 +276,7 @@ func askUserForOTP(remoteClient *RemoteClient, cmd *Command) {
 		SendResponse(remoteClient, cmd.NextCommand)
 		return
 	} else {
-		fmt.Println("Restarting because failed generating OTP for " + remoteClient.RemoteMobileNumber)
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because failed generating OTP for " + remoteClient.RemoteMobileNumber)
 		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
 		SendResponse(remoteClient, "")
 		return
@@ -333,7 +294,7 @@ func generateOTPForBearerToken(remoteClient *RemoteClient, cmd *Command) {
 		updateClient(remoteClient, cmd)
 		// SendResponse(remoteClient, cmd.NextCommand)
 	} else {
-		fmt.Println("Restarting because failed generating OTP for " + remoteClient.RemoteMobileNumber)
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because failed generating OTP for " + remoteClient.RemoteMobileNumber)
 		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
 		SendResponse(remoteClient, "")
 	}
@@ -341,10 +302,9 @@ func generateOTPForBearerToken(remoteClient *RemoteClient, cmd *Command) {
 
 func Search(remoteClient *RemoteClient) (*BookingSlot, error) {
 	remoteClient.Params, _ = readUser(remoteClient)
-	params := remoteClient.Params
-	bk, err := searchByStateDistrict(params.Age, params.State, params.District, remoteClient.Params.BookingPrefs)
+	bk, err := searchByStateDistrict(remoteClient)
 	if err != nil {
-		fmt.Fprintf(os.Stderr,"(Search)Error while searching for slots:%v\n", err)
+		fmt.Fprintf(os.Stderr,remoteClient.RemoteJID + ":(Search)Error while searching for slots:%v\n", err)
 	}
 	return bk, err
 }
@@ -370,34 +330,34 @@ func getBeneficiariesForRemoteUser(remoteClient *RemoteClient, cmd *Command, for
 }
 
 func sendCAPTCHA(remoteClient *RemoteClient, cmd *Command) {
-	fmt.Println("Now sending CAPTCHA request")
+	fmt.Println(remoteClient.RemoteJID + ":Now sending CAPTCHA request")
 	resetPollingInterval(remoteClient, defaultSearchInterval)
 	fileName := remoteClient.RemoteMobileNumber + "_captcha"
 	err := getCaptchaSVG(fileName + ".svg")
 	var f string
 	if err != nil {
-		fmt.Println("Restarting because failed getting CAPTCHA(svg) for " + remoteClient.RemoteMobileNumber)
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because failed getting CAPTCHA(svg) for " + remoteClient.RemoteMobileNumber)
 		remoteClient.Host.SendText(remoteClient.RemoteJID, fmt.Sprintf(cmd.ErrorResponse1, remoteClient.RemoteMobileNumber))
 		SendResponse(remoteClient, "")
 		return
 	}
 	err = exportToPng(fileName + ".svg", fileName + ".png")
 	if err != nil {
-		fmt.Println("Restarting because Failed getting CAPTCHA(png) for " + remoteClient.RemoteMobileNumber)
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because Failed getting CAPTCHA(png) for " + remoteClient.RemoteMobileNumber)
 		remoteClient.Host.SendText(remoteClient.RemoteJID, fmt.Sprintf(cmd.ErrorResponse1, remoteClient.RemoteMobileNumber))
 		SendResponse(remoteClient, "")
 		return
 	}
 	_ , f, _ , err = getPngImage(fileName + ".png")
 	if err != nil {
-		fmt.Println("Restarting because failed getting CAPTCHA(getpng) for " + remoteClient.RemoteMobileNumber)
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because failed getting CAPTCHA(getpng) for " + remoteClient.RemoteMobileNumber)
 		remoteClient.Host.SendText(remoteClient.RemoteJID, fmt.Sprintf(cmd.ErrorResponse1, remoteClient.RemoteMobileNumber))
 		SendResponse(remoteClient, "")
 		return
 	}
 	f, err = getJPEGImage(fileName + ".png")
 	if err != nil {
-		fmt.Println("Restarting because failed getting CAPTCHA(jpg) for " + remoteClient.RemoteMobileNumber)
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because failed getting CAPTCHA(jpg) for " + remoteClient.RemoteMobileNumber)
 		remoteClient.Host.SendText(remoteClient.RemoteJID, fmt.Sprintf(cmd.ErrorResponse1, remoteClient.RemoteMobileNumber))
 		SendResponse(remoteClient, "")
 		return
@@ -413,7 +373,7 @@ func processUserInput(remoteClient *RemoteClient) {
 		if lastSent.ExpectedResponse == strings.ToLower(userInput) {
 			SendResponse(remoteClient, lastSent.NextCommand)
 		} else {
-			fmt.Println("Restarting because ExpectedResponse is different from userInput")
+			fmt.Println(remoteClient.RemoteJID + ":Restarting because ExpectedResponse is different from userInput")
 			SendResponse(remoteClient, "")
 		}
 	} else {
@@ -426,11 +386,11 @@ func processUserInput(remoteClient *RemoteClient) {
 			remoteClient.Params = params
 			if lastSent.Name == "loadsaveddata" {
 				bookingCenterId = remoteClient.Params.BookingPrefs.CenterID
-				fmt.Println("Saved  bookingCenterId")
+				fmt.Println(remoteClient.RemoteJID + ":Saved  bookingCenterId")
 			} else if lastSent.Name == "bookanyslot" {
 				remoteClient.Params.BookingPrefs.BookAnySlot = true
 				writeUser(remoteClient)
-				fmt.Fprintf(os.Stderr, "Saved BookAnySlot. Set to %t.", remoteClient.Params.BookingPrefs.BookAnySlot)
+				fmt.Fprintf(os.Stderr, remoteClient.RemoteJID + ":Saved BookAnySlot. Set to %t.", remoteClient.Params.BookingPrefs.BookAnySlot)
 			}
 		} else if (userInput == "n" || userInput == "no") && lastSent.NextNCommand != "" {
 			nextCmd = lastSent.NextNCommand
@@ -442,7 +402,7 @@ func processUserInput(remoteClient *RemoteClient) {
 			} else if lastSent.Name == "bookanyslot" {
 				remoteClient.Params.BookingPrefs.BookAnySlot = false
 				writeUser(remoteClient)
-				fmt.Println("Saved  BookAnySlot. Set to false.")
+				fmt.Println(remoteClient.RemoteJID + ":Saved  BookAnySlot. Set to false.")
 			}
 		}
 		if lastSent.Name == "search" && bookingCenterId > 0 && !remoteClient.Params.BookingPrefs.BookAnySlot {
@@ -450,7 +410,7 @@ func processUserInput(remoteClient *RemoteClient) {
 		} else if (lastSent.Name == "otp" || lastSent.Name == "otpbeneficiary" || lastSent.Name == "certificate") && otpTransactionId != "" {
 			bearerToken, err = confirmOTP(userInput, remoteClient.Params.OTPTxnDetails.TXNId)
 			if err == nil && bearerToken != "" {
-				fmt.Println("BearerToken received:" + bearerToken)
+				fmt.Println(remoteClient.RemoteJID + ":BearerToken received:" + bearerToken)
 				remoteClient.Params.OTPTxnDetails.BearerToken = bearerToken
 				writeUser(remoteClient)
 			}
@@ -494,10 +454,8 @@ func saveUserInput(remoteClient *RemoteClient) {
 }
 
 func resetParams(remoteClient *RemoteClient, shouldReload bool) {
-	fmt.Println("Resetting Params.")
+	fmt.Println(remoteClient.RemoteJID + ":Resetting Params.")
 	bookingCenterId = 0
-	stateID = 0
-	districtID = 0
 	remoteClient.Params = &UserParams{}
 	remoteClient.Params.CAPTCHA = ""
 	remoteClient.Params.OTPTxnDetails = &OTPTxn{}
@@ -515,6 +473,6 @@ func updateClient(remoteClient *RemoteClient, cmd *Command) {
 	remoteClient.LastSent = cmd
 	remoteClient.LastReceived = remoteClient.Received
 	remoteClient.Received = pkWhatsApp.Message{}
-	fmt.Fprintf(os.Stderr, "LastSent: \n{Name: %s, NextCmd: %s}\n", cmd.Name, cmd.NextCommand)
+	fmt.Fprintf(os.Stderr, remoteClient.RemoteJID + ":LastSent: \n{Name: %s, NextCmd: %s}\n", cmd.Name, cmd.NextCommand)
 }
 
