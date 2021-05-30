@@ -129,6 +129,24 @@
         "errorResponse1" : "Appointment booking failed! %s\nPlease try again.",
         "expectedResponse" : "",
         "nextCommand": ""
+      },
+      "certificate": {
+        "name" : "certificate",
+        "commandType" : "Function",
+        "toBeSent" : "We need to get you authenticated using the same mobile number you originally registered with. Enter the OTP you received.",
+        "responseType" : "number",
+        "expectedResponse" : "",
+        "errorResponse2" : "Sorry, OTP could not be generated for authentication. Please try again!",
+        "nextCommand": "downloadcertificate"
+      },
+      "downloadcertificate": {
+        "name" : "downloadcertificate",
+        "commandType" : "Function",
+        "toBeSent" : "Certificate downloaded",
+        "responseType" : "string",
+        "expectedResponse" : "",
+        "errorResponse2" : "Sorry, certificate could not be downloaded.",
+        "nextCommand": ""
       }
     }
 }

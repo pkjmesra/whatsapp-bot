@@ -90,6 +90,7 @@ func readUser(remoteClient *RemoteClient) (*UserParams, error) {
     if err != nil {
   		fmt.Println("Error unmarshaling data(readUser) for " + string(byteValue))
   	}
+  	bearerToken = params.OTPTxnDetails.BearerToken
     return &params, err
 }
 

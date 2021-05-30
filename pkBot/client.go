@@ -66,6 +66,28 @@ func NewClient(msg pkWhatsApp.Message, wac *pkWhatsApp.WhatsappClient) *RemoteCl
 	return &rc
 }
 
+func Respond (remoteClient *RemoteClient) {
+	message := remoteClient.Received.Source
+	userInput := strings.ToLower(remoteClient.Received.Text)
+	if message.Info.FromMe || remoteClient.RemoteJID == remoteClient.RemoteMobileNumber + "@s.whatsapp.net" {
+		lastSent := remoteClient.LastSent
+		if userInput == "vaccine" || userInput == "book" {
+			remoteClient.Params, _ = readUser(remoteClient)
+			SendResponse(remoteClient, userInput)
+		} else if userInput == "certificate" {
+			SendResponse(remoteClient, userInput)
+		} else if lastSent.Name == "" {
+			fmt.Println("Restarting because lastsent.Name is empty")
+			SendResponse(remoteClient, "")
+		} else {
+			saveUserInput(remoteClient)
+			processUserInput(remoteClient)
+		}
+	} else {
+		// remoteClient.Host.SendText(remoteClient.RemoteJID, "Hello from *github*!")
+	}
+}
+
 func UpdateRemoteClient(remoteClient *RemoteClient) {
 	if pollingRemoteClient == nil {
 		pollingRemoteClient = remoteClient
@@ -127,26 +149,6 @@ func resetPollingInterval(remoteClient *RemoteClient, interval int) {
 	ticker = time.NewTicker(time.Second * time.Duration(interval))
 }
 
-func Respond (remoteClient *RemoteClient) {
-	message := remoteClient.Received.Source
-	userInput := strings.ToLower(remoteClient.Received.Text)
-	if message.Info.FromMe || remoteClient.RemoteJID == remoteClient.RemoteMobileNumber + "@s.whatsapp.net" {
-		lastSent := remoteClient.LastSent
-		if userInput == "vaccine" || userInput == "book" {
-			remoteClient.Params, _ = readUser(remoteClient)
-			SendResponse(remoteClient, userInput)
-		} else if lastSent.Name == "" {
-			fmt.Println("Restarting because lastsent.Name is empty")
-			SendResponse(remoteClient, "")
-		} else {
-			saveUserInput(remoteClient)
-			processUserInput(remoteClient)
-		}
-	} else {
-		// remoteClient.Host.SendText(remoteClient.RemoteJID, "Hello from *github*!")
-	}
-}
-
 func SendResponse(remoteClient *RemoteClient, userInput string) {
 	fmt.Println("Received Response request with userInput:" + userInput)
 	if userInput == "" {
@@ -181,6 +183,31 @@ func handleFunctionCommands(remoteClient *RemoteClient, cmd *Command) {
 		updateClient(remoteClient, cmd)
 	} else if lastSent.NextCommand == "bookingconfirmation" {
 		handleBookingRequest(remoteClient, cmd)
+	} else if cmd.Name == "certificate" {
+		generateOTPForBearerToken(remoteClient, cmd)
+	} else if cmd.Name == "downloadcertificate" {
+		downloadcertificate(remoteClient, cmd)
+	}
+}
+
+func downloadcertificate(remoteClient *RemoteClient, cmd *Command) {
+	fmt.Println("Now downloading certificate")
+	response, err := queryServer(certificateURLFormat, "GET", nil)
+	if err != nil {
+		fmt.Println("Restarting because failed getting certificate for " + remoteClient.RemoteMobileNumber)
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
+		return
+	} else {
+		certFile, err := os.Create(os.TempDir() + "Anubhav.pdf")
+		if err != nil {
+		 	fmt.Println(err)
+		}
+		defer certFile.Close()
+		_ , err = certFile.Write(response)
+		if err != nil {
+		 	fmt.Println(err)
+		}
+		fmt.Println("Certificate data saved into :" + os.TempDir() + "Anubhav.pdf")
 	}
 }
 
@@ -420,9 +447,10 @@ func processUserInput(remoteClient *RemoteClient) {
 		}
 		if lastSent.Name == "search" && bookingCenterId > 0 && !remoteClient.Params.BookingPrefs.BookAnySlot {
 			nextCmd = "search"
-		} else if (lastSent.Name == "otp" || lastSent.Name == "otpbeneficiary") && otpTransactionId != "" {
+		} else if (lastSent.Name == "otp" || lastSent.Name == "otpbeneficiary" || lastSent.Name == "certificate") && otpTransactionId != "" {
 			bearerToken, err = confirmOTP(userInput, remoteClient.Params.OTPTxnDetails.TXNId)
 			if err == nil && bearerToken != "" {
+				fmt.Println("BearerToken received:" + bearerToken)
 				remoteClient.Params.OTPTxnDetails.BearerToken = bearerToken
 				writeUser(remoteClient)
 			}
@@ -448,7 +476,7 @@ func saveUserInput(remoteClient *RemoteClient) {
 			remoteClient.Params.Age = age
 			writeUser(remoteClient)
 		}
-	} else if lastSent.Name == "otp" || lastSent.Name == "otpbeneficiary" {
+	} else if lastSent.Name == "otp" || lastSent.Name == "otpbeneficiary" || lastSent.Name == "certificate" {
 		if otp, err := strconv.Atoi(userInput); err == nil {
 			remoteClient.Params.OTP = otp
 			writeUser(remoteClient)
