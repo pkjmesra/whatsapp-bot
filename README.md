@@ -13,8 +13,9 @@ go get github.com/pkjmesra/whatsapp-bot
 ## Usage
 
 ```go
-go build && go install && mv $GOPATH/bin/whatsapp-bot ./whatsapp-bot
-./whatsapp-bot -i 30
+$ go build && go install && mv $GOPATH/bin/whatsapp-bot ./whatsapp-bot
+
+$ ./whatsapp-bot -i 30
 ```
 - i gives the interval to ping and poll for available vaccination slots for a given set of parameters
 - m can help setup a specific mobile number for which you'd like to book an appointment via whatsapp
