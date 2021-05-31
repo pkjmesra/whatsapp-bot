@@ -51,7 +51,7 @@ func getCaptchaSVG(svgFileName string) error {
     log.Printf("Error while parsing:%s",err.Error())
     return err
   }
-  svgFile, err := os.Create(os.TempDir() + svgFileName)
+  svgFile, err := os.Create(pkBotFilePath(svgFileName))
   if err != nil {
      fmt.Println(err)
      return err
@@ -63,13 +63,13 @@ func getCaptchaSVG(svgFileName string) error {
      fmt.Println(err)
      return err
   }
-  fmt.Println("SVG data saved into :" + os.TempDir() + svgFileName)
+  fmt.Println("SVG data saved into :" + pkBotFilePath(svgFileName))
   return nil
 }
 
 func exportToPng(svgFileName string, pngFileName string) error {
   w, h := 512, 512
-  in, err := os.Open(os.TempDir() + svgFileName)
+  in, err := os.Open(pkBotFilePath(svgFileName))
   if err != nil {
     fmt.Println(err)
     return err
@@ -83,7 +83,7 @@ func exportToPng(svgFileName string, pngFileName string) error {
   rgba := image.NewRGBA(image.Rect(0, 0, w, h))
   icon.Draw(rasterx.NewDasher(w, h, rasterx.NewScannerGV(w, h, rgba, rgba.Bounds())), 2)
 
-  out, err := os.Create(os.TempDir() + pngFileName)
+  out, err := os.Create(pkBotFilePath(pngFileName))
   if err != nil {
     fmt.Println(err)
     return err
@@ -94,12 +94,12 @@ func exportToPng(svgFileName string, pngFileName string) error {
     fmt.Println(err)
     return err
   }
-  fmt.Println("PNG data saved into :" + os.TempDir() + pngFileName)
+  fmt.Println("PNG data saved into :" + pkBotFilePath(pngFileName))
   return nil
 }
 
 func getPngImage(pngFileName string) (image.Image, string, string, error) {
-  f, err := os.Open(os.TempDir() + pngFileName)
+  f, err := os.Open(pkBotFilePath(pngFileName))
   if err != nil {
     log.Printf("Error while loading PNG image:%s",err.Error())
   }
@@ -110,11 +110,11 @@ func getPngImage(pngFileName string) (image.Image, string, string, error) {
     log.Printf("Error while decoding PNG image:%s",err.Error())
   }
   
-  return img, os.TempDir() + pngFileName, fmtName, err
+  return img, pkBotFilePath(pngFileName), fmtName, err
 }
 
 func getJPEGImage(pngFileName string) (string, error) {
-   pngImgFile, err := os.Open(os.TempDir() + pngFileName)
+   pngImgFile, err := os.Open(pkBotFilePath(pngFileName))
    if err != nil {
      fmt.Println("File not found:" + pngFileName)
      return "", err
@@ -135,7 +135,7 @@ func getJPEGImage(pngFileName string) (string, error) {
    // paste PNG image OVER to newImage
    draw.Draw(newImg, newImg.Bounds(), imgSrc, imgSrc.Bounds().Min, draw.Over)
    // create new out JPEG file
-   jpgImgFile, err := os.Create(os.TempDir() + pngFileName + ".jpg")
+   jpgImgFile, err := os.Create(pkBotFilePath(pngFileName + ".jpg"))
    if err != nil {
      fmt.Println("Cannot create JPEG-file!")
      fmt.Println(err)
@@ -153,7 +153,7 @@ func getJPEGImage(pngFileName string) (string, error) {
        return "", err
    }
    fmt.Println("Converted PNG file to JPEG file")
-   return os.TempDir() + pngFileName + ".jpg", nil
+   return pkBotFilePath(pngFileName + ".jpg"), nil
  }
 
 // func convertToGrayScale(img image.Image) (image.Image, string, error) {

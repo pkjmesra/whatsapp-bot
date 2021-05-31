@@ -3,10 +3,12 @@ package pkWhatsApp
 import (
 	"encoding/gob"
 	"fmt"
-	"os"
+    "os"
+    "path/filepath"
+    "strings"
 	// "os/signal"
 	"time"
-	"strings"
+
 	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
 	"github.com/Rhymen/go-whatsapp"
 )
@@ -168,7 +170,7 @@ func login(wac *whatsapp.Conn) error {
 
 func readSession() (whatsapp.Session, error) {
 	session := whatsapp.Session{}
-	file, err := os.Open(os.TempDir() + "/whatsappSession.gob")
+	file, err := os.Open(pkBotFilePath("whatsappSession.gob"))
 	if err != nil {
 		return session, err
 	}
@@ -182,7 +184,7 @@ func readSession() (whatsapp.Session, error) {
 }
 
 func writeSession(session whatsapp.Session) error {
-	file, err := os.Create(os.TempDir() + "/whatsappSession.gob")
+	file, err := os.Create(pkBotFilePath("whatsappSession.gob"))
 	if err != nil {
 		return err
 	}
@@ -193,4 +195,25 @@ func writeSession(session whatsapp.Session) error {
 		return err
 	}
 	return nil
+}
+
+func pkBotRootDirectoryPath() string {
+	path := filepath.Join(os.TempDir(), "pkBot")
+	os.MkdirAll(path, os.ModePerm)
+	return path
+}
+
+func pkBotSessionDirectoryPath() string {
+	path := filepath.Join(pkBotRootDirectoryPath(), "session")
+	os.MkdirAll(path, os.ModePerm)
+	return path
+}
+
+func pkBotFilePath(fileName string) string {
+	path := filepath.Join(pkBotRootDirectoryPath(), fileName)
+	fName := strings.ToLower(fileName)
+	if strings.HasSuffix(fName, ".gob") {
+		path = filepath.Join(pkBotSessionDirectoryPath(), fileName)
+	}
+	return path
 }

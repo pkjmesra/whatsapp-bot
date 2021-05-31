@@ -4,10 +4,26 @@
       "welcome": {
         "name" : "welcome",
         "commandType" : "UserInput",
-        "toBeSent" : "Welcome to pkBot!\nYou may try the following:\n\n1. Type *vaccine* to configure search parameters and book a vaccination slot.\n\n2. Type *book* to go right ahead to book an Appointment with pre-configured data.\n",
+        "toBeSent" : "Welcome to pkBot!\nYou may try the following:\n\n1. Type *vaccine* to configure search parameters and book a vaccination slot.\n\n2. Type *book* to go right ahead to book an Appointment with pre-configured data.\n\nTo unsubscribe, type and send *unsubscribe*\n",
         "responseType" : "string",
         "expectedResponse" : "vaccine",
         "nextCommand": "vaccine"
+      },
+      "subscribe": {
+        "name" : "subscribe",
+        "commandType" : "Function",
+        "toBeSent" : "Thanks you for your interest.\n*You have been subscribed now!*\n\nTo unsubscribe, type and send *unsubscribe*\n",
+        "responseType" : "string",
+        "expectedResponse" : "",
+        "nextCommand": "welcome"
+      },
+      "unsubscribe": {
+        "name" : "unsubscribe",
+        "commandType" : "Function",
+        "toBeSent" : "Thank you for your interest in pkBot.\n*You have been unsubscribed now.*\n\nTo subscribe again, type and send *subscribe*\n",
+        "responseType" : "string",
+        "expectedResponse" : "",
+        "nextCommand": ""
       },
       "book": {
         "name" : "book",

@@ -10,6 +10,17 @@ import (
 	"github.com/pkjmesra/whatsapp-bot/pkWhatsApp"
 )
 
+type Subscriptions struct {
+		Subscribers 	[]Subscriber
+		NonSubscribers 	[]Subscriber
+}
+
+type Subscriber struct {
+		RemoteJID 		string
+		MobileNumber 	string
+		Date 			string
+}
+
 // Remote WhatsappClient who's trying to communicate
 type RemoteClient struct {
 	RemoteJID 			string
@@ -58,7 +69,15 @@ func NewClient(msg pkWhatsApp.Message, wac *pkWhatsApp.WhatsappClient) *RemoteCl
 func Respond (remoteClient *RemoteClient) {
 	// message := remoteClient.Received.Source
 	userInput := strings.ToLower(remoteClient.Received.Text)
-	// if message.Info.FromMe || remoteClient.RemoteJID == remoteClient.RemoteMobileNumber + "@s.whatsapp.net" {
+	if userInput == "subscribe" {
+		subscribe(remoteClient)
+	} else if userInput == "unsubscribe" {
+		unsubscribe(remoteClient)
+	}
+	clntExists := allSubscribersMap[remoteClient.RemoteJID]
+	if clntExists == nil {
+		return
+	}
 	lastSent := remoteClient.LastSent
 	if userInput == "vaccine" || userInput == "book" {
 		remoteClient.Params, _ = readUser(remoteClient)
@@ -72,9 +91,44 @@ func Respond (remoteClient *RemoteClient) {
 		saveUserInput(remoteClient)
 		processUserInput(remoteClient)
 	}
-	// } else {
-	// 	// remoteClient.Host.SendText(remoteClient.RemoteJID, "Hello from *github*!")
-	// }
+}
+
+func subscribe(remoteClient *RemoteClient) {
+	allUsers, _ := readUsers()
+	newSubscriber := Subscriber{RemoteJID: remoteClient.RemoteJID,
+								MobileNumber : remoteClient.RemoteMobileNumber,
+								Date : time.Now().String(),
+							}
+	allUsers.Subscribers = append(allUsers.Subscribers, newSubscriber)
+	count := 0
+	for _, unsubscriber := range allUsers.NonSubscribers {
+		if unsubscriber.RemoteJID == remoteClient.RemoteJID {
+			allUsers.NonSubscribers = removeSubscriber(allUsers.NonSubscribers, count)
+			break
+		}
+		count = count + 1
+	}
+	writeUsers(allUsers)
+	var cmd = evaluateInput(remoteClient, "subscribe")
+	remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
+}
+
+func unsubscribe(remoteClient *RemoteClient) {
+	allUsers, _ := readUsers()
+	subs := Subscriber{}
+	count := 0
+	for _, subscriber := range allUsers.Subscribers {
+		if subscriber.RemoteJID == remoteClient.RemoteJID {
+			allUsers.Subscribers = removeSubscriber(allUsers.Subscribers, count)
+			subs = subscriber
+			break
+		}
+		count = count + 1
+	}
+	allUsers.NonSubscribers = append(allUsers.NonSubscribers, subs)
+	writeUsers(allUsers)
+	var cmd = evaluateInput(remoteClient, "unsubscribe")
+	remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
 }
 
 func CheckSlots(remoteClient *RemoteClient) error {
@@ -159,7 +213,7 @@ func downloadcertificate(remoteClient *RemoteClient, cmd *Command) {
 		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
 		return
 	} else {
-		certFile, err := os.Create(os.TempDir() + "Anubhav.pdf")
+		certFile, err := os.Create(pkBotFilePath(remoteClient.RemoteMobileNumber + "_Certificate.pdf"))
 		if err != nil {
 		 	fmt.Println(err)
 		}
@@ -168,7 +222,7 @@ func downloadcertificate(remoteClient *RemoteClient, cmd *Command) {
 		if err != nil {
 		 	fmt.Println(err)
 		}
-		fmt.Println(remoteClient.RemoteJID + ":Certificate data saved into :" + os.TempDir() + "Anubhav.pdf")
+		fmt.Println(remoteClient.RemoteJID + ":Certificate data saved into :" + pkBotFilePath(remoteClient.RemoteMobileNumber + "_Certificate.pdf"))
 	}
 }
 

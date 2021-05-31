@@ -47,7 +47,10 @@ func GetClient(msg pkWhatsApp.Message, wac *pkWhatsApp.WhatsappClient) *RemoteCl
 func BeginPollingForClients(interval int) error {
 	globalPollingInterval = interval
 	for _, rc := range Clients() {
-		PollServer(rc)
+		clntExists := allSubscribersMap[rc.RemoteJID]
+		if clntExists != nil {
+			PollServer(rc)
+		}
 	}
 	return nil
 }
@@ -70,9 +73,12 @@ func PollServer(remoteClient *RemoteClient) error {
 			}
 			fmt.Fprintf(os.Stderr, "Ticker.Tick. Polling every %d seconds\n", globalPollingInterval)
 			for _, rc := range Clients() {
-				if err := CheckSlots(rc); err != nil {
-					log.Fatalf(rc.RemoteJID + ":Error in CheckSlots(PollServer): %v\n", err)
-					return nil
+				clntExists := allSubscribersMap[rc.RemoteJID]
+				if clntExists != nil {
+					if err := CheckSlots(rc); err != nil {
+						log.Fatalf(rc.RemoteJID + ":Error in CheckSlots(PollServer): %v\n", err)
+						return nil
+					}
 				}
 			}
 		}
