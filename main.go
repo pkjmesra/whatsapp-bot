@@ -56,6 +56,7 @@ func main() {
 			fmt.Println("Message Received (and ignored) -> ID : " + msg.From + " : Message:" + msg.Text)
 		}
 	})
+	pkBot.SetWACClient(client)
 	Execute()
 }
 

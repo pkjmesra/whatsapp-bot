@@ -85,3 +85,40 @@ func confirmOTP(otp string, txnId string) (string, error) {
 	lastOTP = ""
 	return bearerToken, nil
 }
+
+func askUserForOTP(remoteClient *RemoteClient, cmd *Command) {
+	var txn *OTPTxn
+	var err error
+	resetPollingInterval(remoteClient, defaultSearchInterval)
+	fmt.Println(remoteClient.RemoteJID + ":Generating OTP for booking now")
+	txn, err = generateOTP(remoteClient.RemoteMobileNumber, false)
+	if err == nil && txn.TXNId != "" {
+		remoteClient.Params.OTPTxnDetails = txn
+		writeUser(remoteClient)
+		updateClient(remoteClient, cmd)
+		SendResponse(remoteClient, cmd.NextCommand)
+		return
+	} else {
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because failed generating OTP for " + remoteClient.RemoteMobileNumber)
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
+		SendResponse(remoteClient, "")
+		return
+	}
+}
+
+func generateOTPForBearerToken(remoteClient *RemoteClient, cmd *Command) {
+	var txn *OTPTxn
+	var err error
+	txn, err = generateOTP(remoteClient.RemoteMobileNumber, false)
+	if err == nil && txn.TXNId != "" {
+		remoteClient.Params.OTPTxnDetails = txn
+		writeUser(remoteClient)
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
+		updateClient(remoteClient, cmd)
+		// SendResponse(remoteClient, cmd.NextCommand)
+	} else {
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because failed generating OTP for " + remoteClient.RemoteMobileNumber)
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse2)
+		SendResponse(remoteClient, "")
+	}
+}

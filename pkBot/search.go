@@ -12,93 +12,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-type PotentialSession struct {
-	CenterID 		  int
-	CenterName 		  string
-	CenterAddress 	  string
-	SessionID         string
-	Date              string
-	AvailableCapacity float64
-	MinAgeLimit       int
-	Vaccine           string
-	Dose1Capacity     float64
-	Dose2Capacity     float64
-	Slots             []string
-}
-type BookingSlot struct {
-		Available 	bool
-		Preferred 	bool
-		CenterID 	int
-		BookAnySlot bool
-		CenterName  string
-		SessionID 	string
-		Slot 		string
-		Description string
-		PotentialSessions []PotentialSession
-		EligibleCount int
-		TotalDose1Available int
-	}
-
 var (
 	slotsAvailable bool
 	bookingSlot *BookingSlot
 	pinCode, bookingCenterId int
 )
-
-type StateList struct {
-	States []struct {
-		StateID    int    `json:"state_id"`
-		StateName  string `json:"state_name"`
-		StateNameL string `json:"state_name_l"`
-	} `json:"states"`
-	TTL int `json:"ttl"`
-}
-
-type DistrictList struct {
-	Districts []struct {
-		StateID       int    `json:"state_id"`
-		DistrictID    int    `json:"district_id"`
-		DistrictName  string `json:"district_name"`
-		DistrictNameL string `json:"district_name_l"`
-	} `json:"districts"`
-	TTL int `json:"ttl"`
-}
-
-type Appointments struct {
-	Centers []struct {
-		CenterID      int     `json:"center_id"`
-		Name          string  `json:"name"`
-		NameL         string  `json:"name_l"`
-		StateName     string  `json:"state_name"`
-		StateNameL    string  `json:"state_name_l"`
-		DistrictName  string  `json:"district_name"`
-		DistrictNameL string  `json:"district_name_l"`
-		BlockName     string  `json:"block_name"`
-		BlockNameL    string  `json:"block_name_l"`
-		Pincode       int     `json:"pincode"`
-		Address       string  `json:"address"`
-		Lat           float64 `json:"lat"`
-		Long          float64 `json:"long"`
-		From          string  `json:"from"`
-		To            string  `json:"to"`
-		FeeType       string  `json:"fee_type"`
-		VaccineFees   []struct {
-			Vaccine string `json:"vaccine"`
-			Fee     string `json:"fee"`
-		} `json:"vaccine_fees"`
-		Sessions []struct {
-			CenterID 		  int
-			SessionID         string   `json:"session_id"`
-			Date              string   `json:"date"`
-			AvailableCapacity float64  `json:"available_capacity"`
-			MinAgeLimit       int      `json:"min_age_limit"`
-			Vaccine           string   `json:"vaccine"`
-			Dose1Capacity     float64   `json:"available_capacity_dose1"`
-			Dose2Capacity     float64   `json:"available_capacity_dose2"`
-			Slots             []string `json:"slots"`
-		} `json:"sessions"`
-	} `json:"centers"`
-}
 
 func timeNow() string {
 	return time.Now().Format("02-01-2006")
@@ -274,4 +192,41 @@ func getAvailableSessions(response []byte, age int, criteria string, bk *Booking
 	bk.Available = slotsAvailable
 	bk.Description = buf.String()
 	return bk, nil
+}
+
+func Search(remoteClient *RemoteClient) (*BookingSlot, error) {
+	remoteClient.Params, _ = readUser(remoteClient)
+	bk, err := searchByStateDistrict(remoteClient)
+	if err != nil {
+		fmt.Fprintf(os.Stderr,remoteClient.RemoteJID + ":(Search)Error while searching for slots:%v\n", err)
+	}
+	return bk, err
+}
+
+func handleSearchRequest(remoteClient *RemoteClient, cmd *Command) {
+	bk, err := Search(remoteClient)
+	if err != nil{
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because error while searching for slots")
+		SendResponse(remoteClient, "")
+	} else {
+		if bk.Description == "" {
+			fmt.Println(remoteClient.RemoteJID + ":Restarting because no slot found from the search")
+			cmd.ToBeSent = cmd.ErrorResponse1
+			remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
+			SendResponse(remoteClient, "")
+			return
+		}
+		if bookingCenterId <= 0 && !remoteClient.Params.BookingPrefs.BookAnySlot {
+			fmt.Println(remoteClient.RemoteJID + ":All slots being shared with user since preferred booking center is not set")
+			remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent + bk.Description)
+		}
+		if (bookingCenterId > 0 || remoteClient.Params.BookingPrefs.BookAnySlot) && bk.Description != "" {
+			fmt.Println(remoteClient.RemoteJID + ":Preferred booking center is set already and center has slots")
+			bk.BookAnySlot = remoteClient.Params.BookingPrefs.BookAnySlot
+			remoteClient.Params.BookingPrefs = bk
+			writeUser(remoteClient)
+			askUserForOTP(remoteClient, cmd)
+		}
+		updateClient(remoteClient, cmd)
+	}
 }

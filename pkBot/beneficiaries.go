@@ -92,3 +92,23 @@ func getBeneficiaries() (*BeneficiaryList, error) {
 	}
 	return &beneficiaryList, err
 }
+
+func getBeneficiariesForRemoteUser(remoteClient *RemoteClient, cmd *Command, force bool){
+	var beneficiariesList *BeneficiaryList
+	var err error
+	savedBeneficiaries := remoteClient.Params.Beneficiaries
+	if force || len(savedBeneficiaries.Beneficiaries) == 0 || savedBeneficiaries.EligibleCount == 0 {
+		beneficiariesList, err = getBeneficiaries()
+		if err == nil && beneficiariesList.Description != ""{
+			eligible, _ := eligibleBeneficiaries(beneficiariesList)
+			beneficiariesList.EligibleCount = len(eligible)
+			remoteClient.Params.Beneficiaries = beneficiariesList
+			remoteClient.Params.BookingPrefs.EligibleCount = len(eligible)
+			writeUser(remoteClient)
+			cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, beneficiariesList.Description)
+			remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
+		}
+	}
+	updateClient(remoteClient, cmd)
+	SendResponse(remoteClient, cmd.NextCommand)
+}

@@ -100,3 +100,46 @@ func eligibleBeneficiaries(beneficiaryList *BeneficiaryList) ([]string, string) 
 // 		}
 // 	}
 // }
+
+func handleBookingRequest(remoteClient *RemoteClient, cmd *Command) {
+	var cnf string
+	var err error
+	cnf, err = bookAppointment(remoteClient.Params.Beneficiaries, remoteClient.Params.CAPTCHA, remoteClient.Params.BookingPrefs)
+	if err == nil && cnf != "" {
+		if remoteClient.Params.ConfirmationID == "" {
+			remoteClient.Params.ConfirmationID = cnf
+		} else {
+			remoteClient.Params.ConfirmationID = remoteClient.Params.ConfirmationID + "," + cnf
+		}
+		writeUser(remoteClient)
+		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, cnf)
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
+		updateClient(remoteClient, cmd)
+	} else {
+		cmd.ErrorResponse1 = fmt.Sprintf(cmd.ErrorResponse1, err.Error())
+		remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ErrorResponse1)
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because appointment confirmation failed.")
+		SendResponse(remoteClient, "")
+	}
+	resetPollingInterval(remoteClient, globalPollingInterval)
+}
+
+func handleAdhocBookingRequest(remoteClient *RemoteClient, cmd *Command) {
+	fmt.Println(remoteClient.RemoteJID + ":Received booking request for pre-configured data")
+	params := remoteClient.Params
+	if params.State != "" && params.District != "" && params.Age > 0 {
+		fmt.Println(remoteClient.RemoteJID + ":Pre-configured data found")
+		if remoteClient.LastSent.NextCommand == "" {
+			cd := Command{NextCommand:"search"}
+			remoteClient.LastSent = &cd
+		}
+		updateClient(remoteClient, cmd)
+		SendResponse(remoteClient, cmd.NextCommand)
+		return
+	} else {
+		fmt.Println(remoteClient.RemoteJID + ":Restarting because pre-configured data not found")
+		SendResponse(remoteClient, "")
+	}
+	updateClient(remoteClient, cmd)
+	return
+}

@@ -219,3 +219,39 @@ func getJPEGImage(pngFileName string) (string, error) {
 //   text, _ := client.Text()
 //   fmt.Println("CAPTCHA from tesseract:",text)
 // }
+
+func sendCAPTCHA(remoteClient *RemoteClient, cmd *Command) {
+  fmt.Println(remoteClient.RemoteJID + ":Now sending CAPTCHA request")
+  resetPollingInterval(remoteClient, defaultSearchInterval)
+  fileName := remoteClient.RemoteMobileNumber + "_captcha"
+  err := getCaptchaSVG(fileName + ".svg")
+  var f string
+  if err != nil {
+    fmt.Println(remoteClient.RemoteJID + ":Restarting because failed getting CAPTCHA(svg) for " + remoteClient.RemoteMobileNumber)
+    remoteClient.Host.SendText(remoteClient.RemoteJID, fmt.Sprintf(cmd.ErrorResponse1, remoteClient.RemoteMobileNumber))
+    SendResponse(remoteClient, "")
+    return
+  }
+  err = exportToPng(fileName + ".svg", fileName + ".png")
+  if err != nil {
+    fmt.Println(remoteClient.RemoteJID + ":Restarting because Failed getting CAPTCHA(png) for " + remoteClient.RemoteMobileNumber)
+    remoteClient.Host.SendText(remoteClient.RemoteJID, fmt.Sprintf(cmd.ErrorResponse1, remoteClient.RemoteMobileNumber))
+    SendResponse(remoteClient, "")
+    return
+  }
+  _ , f, _ , err = getPngImage(fileName + ".png")
+  if err != nil {
+    fmt.Println(remoteClient.RemoteJID + ":Restarting because failed getting CAPTCHA(getpng) for " + remoteClient.RemoteMobileNumber)
+    remoteClient.Host.SendText(remoteClient.RemoteJID, fmt.Sprintf(cmd.ErrorResponse1, remoteClient.RemoteMobileNumber))
+    SendResponse(remoteClient, "")
+    return
+  }
+  f, err = getJPEGImage(fileName + ".png")
+  if err != nil {
+    fmt.Println(remoteClient.RemoteJID + ":Restarting because failed getting CAPTCHA(jpg) for " + remoteClient.RemoteMobileNumber)
+    remoteClient.Host.SendText(remoteClient.RemoteJID, fmt.Sprintf(cmd.ErrorResponse1, remoteClient.RemoteMobileNumber))
+    SendResponse(remoteClient, "")
+    return
+  }
+  remoteClient.Host.SendImage(remoteClient.RemoteJID, f, "jpeg", cmd.ToBeSent)
+}
