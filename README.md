@@ -14,12 +14,14 @@ go get github.com/pkjmesra/whatsapp-bot
 
 ```go
 go build && go install && mv $GOPATH/bin/whatsapp-bot ./whatsapp-bot
-./whatsapp-bot -i 60 -m <91MobileNumber>
+./whatsapp-bot -i 30
 ```
 - i gives the interval to ping and poll for available vaccination slots for a given set of parameters
 - m can help setup a specific mobile number for which you'd like to book an appointment via whatsapp
 
-When you run, your mobile/whatsapp will become the host for sending/receiving data with <91MobileNumber>.
+When you run, your mobile/whatsapp will become the host for sending/receiving data with [91MobileNumber].
+
+- On your mobile phone, launch whatsapp and send a "subscribe" message to yourself or ask your friend to send a "subscribe" message to your number. (The same number with which you've logged in into whatsapp-bot)
 
 - Every API call is automated for CoWIN. 
 - OTP is sent to your mobile <91MobileNumber>. Enter it in whatsapp when prompted.
