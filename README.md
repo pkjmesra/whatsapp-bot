@@ -25,9 +25,33 @@ When you run, your mobile/whatsapp will become the host for sending/receiving da
 - OTP is sent to your mobile <91MobileNumber>. Enter it in whatsapp when prompted.
 - CAPTCHA will be sent on whatsapp itself. Enter CAPTCHA to proceed for appointment.
 
-Entire transaction can be finished in <time taken for OTP> + <time taken for CAPTCHA>.
+Entire transaction can be finished in : time taken for OTP + time taken for CAPTCHA.
 
 Enjoy!
+
+- Subscribe to getting notified
+![](./images/1.jpg)
+
+
+- Setting up your search parameters
+![](./images/2.jpg)
+
+
+- Saving your search parameters and confirming
+![](./images/3.jpg)
+
+
+- Receiving your registered beneficiaries
+![](./images/4.jpg)
+
+
+- Receiving the notification when the slots become available
+![](./images/5.jpg)
+
+
+- Trying to book the appointment and receive the confirmation or message if it could not be booked.
+![](./images/6.jpg)
+
 
 ```go
 package main

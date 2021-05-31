@@ -13,14 +13,16 @@ func handleUserInputs(remoteClient *RemoteClient, cmd *Command) {
 		fmt.Println(remoteClient.RemoteJID + ":Generated OTP for booking. Now sending text to the user to receive OTP.")
 		br := remoteClient.Params.BookingPrefs
 		var centerName string
+		var date string
 		if len(br.PotentialSessions) > 0 {
 			ps := br.PotentialSessions[0]
 			centerName = ps.CenterName
+			date = ps.Date
 			if len(br.PotentialSessions) > 1 {
 				centerName = centerName + " and others"
 			}
 		}
-		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, len(br.PotentialSessions), centerName, br.TotalDose1Available)
+		cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, len(br.PotentialSessions), date, centerName, br.TotalDose1Available)
 	}
 	remoteClient.Host.SendText(remoteClient.RemoteJID, cmd.ToBeSent)
 	updateClient(remoteClient, cmd)
