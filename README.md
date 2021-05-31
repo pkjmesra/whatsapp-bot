@@ -55,23 +55,7 @@ Enjoy!
 ![](./images/6.jpg)
 
 
-```go
-package main
+After launching, app will create a [WhatsApp connection](https://github.com/Rhymen/go-whatsapp). If you are not logged in, it will print a QR code in the terminal. Scan it with your phone and you are ready to go!
 
-import "github.com/pkjmesra/whatsapp-bot/pkWhatsApp"
-
-func main() {
-	client := pkWhatsApp.NewClient()
-
-	client.Listen(func(msg pkWhatsApp.Message) {
-		if msg.Text == "Hi" {
-			client.SendText(msg.From, "Hello from github!")
-		}
-	})
-}
-```
-
-After executing `pkWhatsApp.NewClient()` function, app will create a [WhatsApp connection](https://github.com/Rhymen/go-whatsapp). If you are not logged in, it will print a QR code in the terminal. Scan it with your phone and you are ready to go!
-
-> Bot will remember the session so there is no need to authenticate everytime.
+> Bot will remember the session (TempDir > pkBot > Session > WhatsappSession.gob) so there is no need to authenticate everytime.
 
