@@ -32,7 +32,7 @@ Entire transaction can be finished in : time taken for OTP + time taken for CAPT
 
 ## Getting Started on Android
   On your Android phone having the whatsapp running with the same number with which you logged in in the previous step, please do the following setup for OTP.
-  
+
   By using Tremux you can run script and receive the notification on your phone.
 
   - ### Install Termux 
@@ -71,6 +71,8 @@ Entire transaction can be finished in : time taken for OTP + time taken for CAPT
          python otp.py 91Your-Mobile-Number-Here-With-Which-You-Have-Launched-WhatsApp
 
 When OTP is received, it will launch whatsapp on your mobile to send it to the number with which it was launched on the PC/Mac.
+
+Now open Whatsapp on your Android and send type : *subscribe* and send it to the same number with which you have logged in on the whatsapp-bot on your Mac/PC.
 
 Enjoy!
 
