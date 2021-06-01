@@ -5,7 +5,7 @@ import sys
 import re
 import time
 import datetime
-import urllib.request
+import os
 
 # Get Mobile last msg for otp Checking  
 def get_msg():
@@ -41,11 +41,11 @@ if __name__== "__main__":
             diff = (d2 - d1).total_seconds()
             if (curr_msg_body != last_msg_body and "cowin" in last_msg_body.lower()) or diff <= 180:
                 otp = re.findall("(\d{6})",last_msg_body)[0]
-                print(f'')
+                print(f'                        ')
                 sys.stdout.write("\033[F")
                 break
             time.sleep(1)
     except (Exception,KeyboardInterrupt) as e:
         print(e)
     print(otp)
-    urllib.request.urlopen('https://wa.me/' + sys.argv[1] + '/?text='+otp)
+    os.system("termux-open-url https://wa.me/" + sys.argv[1] + "/?text="+otp)
