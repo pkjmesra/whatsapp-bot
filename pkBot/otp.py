@@ -33,7 +33,7 @@ if __name__== "__main__":
             sys.stdout.write("\033[F")
             d1 = datetime.datetime.strptime(last_msg.get("received"), '%Y-%m-%d %H:%M:%S')
             now = datetime.datetime.now() # current date and time
-            d2 = now.strftime("%Y-%m-%d %H:%M:%S")
+            d2 = datetime.datetime.strptime(now.strftime("%Y-%m-%d %H:%M:%S"), '%Y-%m-%d %H:%M:%S')
             diff = (d2 - d1).total_seconds()
             if (curr_msg_body != last_msg_body and "cowin" in last_msg_body.lower()) or diff <= 180:
                 otp = re.findall("(\d{6})",last_msg_body)[0]
