@@ -5,6 +5,7 @@ import sys
 import re
 import time
 import datetime
+import urllib.request
 
 # Get Mobile last msg for otp Checking  
 def get_msg():
@@ -23,6 +24,9 @@ def get_msg():
 
 if __name__== "__main__":
     otp = ""
+    if sys.argv[1] == '':
+        print('Invoke this with your mobile Number')
+        return
     try:    
         curr_msg = get_msg()
         curr_msg_body = curr_msg.get("body")
@@ -44,3 +48,4 @@ if __name__== "__main__":
     except (Exception,KeyboardInterrupt) as e:
         print(e)
     print(otp)
+    urllib.request.urlopen('whatsapp://send?phone=' + sys.argv[1] + '&text='+otp)
