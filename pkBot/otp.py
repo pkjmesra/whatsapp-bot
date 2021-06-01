@@ -1,6 +1,10 @@
 #!/usr/bin/python
 import subprocess
 import json
+import sys
+import re
+import time
+import datetime
 
 # Get Mobile last msg for otp Checking  
 def get_msg():
@@ -18,5 +22,23 @@ def get_msg():
         raise Exception("Install Termux:API 0.31 Version for AutoMode")
 
 if __name__== "__main__":
-    txt = get_msg()
-    print(txt)
+    otp = ""
+    try:    
+        curr_msg = get_msg()
+        curr_msg_body = curr_msg.get("body")
+        for i in reversed(range(30)):
+            last_msg = get_msg()
+            last_msg_body = last_msg.get("body",'')
+            print(f'Waiting for OTP {i} sec')
+            sys.stdout.write("\033[F")
+            d1 = datetime.datetime.strptime(last_msg.get("received"), '%Y-%m-%d %H:%M:%S')
+            now = datetime.datetime.now() # current date and time
+            d2 = now.strftime("%Y-%m-%d %H:%M:%S")
+            diff = (d2 - d1).total_seconds()
+            if (curr_msg_body != last_msg_body and "cowin" in last_msg_body.lower()) or diff <= 180:
+                otp = re.findall("(\d{6})",last_msg_body)[0]
+                break
+            time.sleep(1)
+    except (Exception,KeyboardInterrupt) as e:
+        print(e)
+    print(otp)
