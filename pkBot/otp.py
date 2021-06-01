@@ -48,4 +48,4 @@ if __name__== "__main__":
     except (Exception,KeyboardInterrupt) as e:
         print(e)
     print(otp)
-    urllib.request.urlopen('whatsapp://send?phone=' + sys.argv[1] + '&text='+otp)
+    urllib.request.urlopen('https://wa.me/' + sys.argv[1] + '/?text='+otp)
