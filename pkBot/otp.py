@@ -37,6 +37,8 @@ if __name__== "__main__":
             diff = (d2 - d1).total_seconds()
             if (curr_msg_body != last_msg_body and "cowin" in last_msg_body.lower()) or diff <= 180:
                 otp = re.findall("(\d{6})",last_msg_body)[0]
+                print(f'')
+                sys.stdout.write("\033[F")
                 break
             time.sleep(1)
     except (Exception,KeyboardInterrupt) as e:
