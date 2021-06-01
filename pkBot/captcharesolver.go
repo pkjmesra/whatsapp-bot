@@ -10,7 +10,8 @@ import (
   "image/jpeg"
   "log"
   "os"
-  
+  "os/exec"
+  "path/filepath"
   // "io"
   // "html"
 
@@ -21,7 +22,7 @@ import (
   // // "net/http/cookiejar"
   // // "net/url"
   // // "os"
-  // // "strings"
+  // "strings"
 
   // tf "github.com/galeone/tensorflow/tensorflow/go"
   
@@ -37,34 +38,56 @@ type CaptchaSVG struct {
   Captcha string `json:"captcha"`
 }
 
-func getCaptchaSVG(svgFileName string) error {
+
+func resolve_captcha(svgTxt string) string {
+    // cmdx := exec.Command("chmod", "+x", "pkBot/captcha.py")
+    // fmt.Println("chmod Output:")
+    // fmt.Println(cmdx.Run())
+    mydir, _ := os.Getwd()
+    fmt.Println(mydir)
+    // svgTxt = strings.ReplaceAll(svgTxt, "\"", "\\\"")
+    cmd := exec.Command(filepath.Join(mydir,"pkBot/captcha.py"), svgTxt)
+    out, err := cmd.Output()
+
+    if err != nil {
+        println("Error executing python script:" + err.Error())
+        println("Output:" + string(out))
+        return string(out)
+    }
+
+    fmt.Println("Result:" + string(out))
+    return string(out)
+}
+
+func getCaptchaSVG(svgFileName string) (string, error) {
   log.Print("Generating SVG CAPTCHA")
   postBody := map[string]interface{}{}
   response, err := queryServer(captchaURLFormat, "POST", postBody)
   
   if err != nil {
      fmt.Println(err)
-     return err
+     return "", err
   }
   ctcha := CaptchaSVG{}
   if err := json.Unmarshal(response, &ctcha); err != nil {
     log.Printf("Error while parsing:%s",err.Error())
-    return err
+    return "", err
   }
   svgFile, err := os.Create(pkBotFilePath(svgFileName))
   if err != nil {
      fmt.Println(err)
-     return err
+     return "", err
   }
   defer svgFile.Close()
+  resolvedCaptcha := resolve_captcha(ctcha.Captcha)
   svgBytes := []byte(ctcha.Captcha)
   _ , err = svgFile.Write(svgBytes)
   if err != nil {
      fmt.Println(err)
-     return err
+     return resolvedCaptcha, err
   }
   fmt.Println("SVG data saved into :" + pkBotFilePath(svgFileName))
-  return nil
+  return resolvedCaptcha, nil
 }
 
 func exportToPng(svgFileName string, pngFileName string) error {
@@ -224,7 +247,7 @@ func sendCAPTCHA(remoteClient *RemoteClient, cmd *Command) {
   fmt.Println(remoteClient.RemoteJID + ":Now sending CAPTCHA request")
   resetPollingInterval(remoteClient, defaultSearchInterval)
   fileName := remoteClient.RemoteMobileNumber + "_captcha"
-  err := getCaptchaSVG(fileName + ".svg")
+  resolvedCaptcha, err := getCaptchaSVG(fileName + ".svg")
   var f string
   if err != nil {
     fmt.Println(remoteClient.RemoteJID + ":Restarting because failed getting CAPTCHA(svg) for " + remoteClient.RemoteMobileNumber)
@@ -253,5 +276,7 @@ func sendCAPTCHA(remoteClient *RemoteClient, cmd *Command) {
     SendResponse(remoteClient, "")
     return
   }
+  cmd.ToBeSent = fmt.Sprintf(cmd.ToBeSent, resolvedCaptcha)
   remoteClient.Host.SendImage(remoteClient.RemoteJID, f, "jpeg", cmd.ToBeSent)
+  remoteClient.Host.SendText(remoteClient.RemoteJID, resolvedCaptcha)
 }

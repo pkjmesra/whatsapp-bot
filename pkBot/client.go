@@ -50,6 +50,9 @@ func Respond (remoteClient *RemoteClient) {
 		SendResponse(remoteClient, userInput)
 	} else if userInput == "certificate" {
 		SendResponse(remoteClient, userInput)
+	} else if userInput == "otp" || userInput == "readcaptcha" {
+		SendResponse(remoteClient, userInput)
+		askUserForOTP(remoteClient, evaluateInput(remoteClient, userInput))
 	} else if lastSent.Name == "" {
 		fmt.Println(remoteClient.RemoteJID + ":Restarting because lastsent.Name is empty")
 		SendResponse(remoteClient, "")
@@ -82,8 +85,12 @@ func handleFunctionCommands(remoteClient *RemoteClient, cmd *Command) {
 	}
 	if lastSent.NextCommand == "search" {
 		handleSearchRequest(remoteClient, cmd)
+	} else if cmd.Name == "otp" {
+		generateOTPForBearerToken(remoteClient, cmd)
 	} else if cmd.Name == "otpbeneficiary" {
 		generateOTPForBearerToken(remoteClient, cmd)
+	} else if cmd.Name == "readcaptcha" {
+		sendCAPTCHA(remoteClient, cmd)
 	} else if cmd.Name == "beneficiariesupdate" {
 		getBeneficiariesForRemoteUser(remoteClient, cmd, true)
 	} else if lastSent.NextCommand == "beneficiaries" {

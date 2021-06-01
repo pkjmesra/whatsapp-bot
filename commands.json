@@ -131,7 +131,7 @@
       "readcaptcha": {
         "name" : "readcaptcha",
         "commandType" : "Function",
-        "toBeSent" : "Please type the exact characters (case sensitive) as you see in this CAPTCHA image\n",
+        "toBeSent" : "Please type the exact characters (case sensitive) as you see in this CAPTCHA image\n\nAuto detection: %s \n\nType only if it's different.",
         "responseType" : "string",
         "errorResponse1" : "Failed getting CAPTCHA for %s.",
         "expectedResponse" : "",
