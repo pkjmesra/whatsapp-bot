@@ -26,7 +26,7 @@ if __name__== "__main__":
     otp = ""
     if sys.argv[1] == '':
         print('Invoke this with your mobile Number')
-        return
+        exit(1)
     try:    
         curr_msg = get_msg()
         curr_msg_body = curr_msg.get("body")
