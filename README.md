@@ -1,6 +1,8 @@
 # WhatsApp Bot ![Go](https://github.com/pkjmesra/whatsapp-bot/workflows/Go/badge.svg)
 Whatsapp Bot for CoWIN vaccination (with automated CAPTCHA verification)
 
+*This is absolutely for academic reference purposes only. Lagalities arising out of commercial or personal use is none of the concerns of the author(s) of this and/or any related repo*
+
 ![WhatsApp Icon](https://cdn.icon-icons.com/icons2/373/PNG/96/Whatsapp_37229.png)
 ![CoWIN Icon](https://prod-cdn.preprod.co-vin.in/assets/images/covid19logo.jpg)
 
