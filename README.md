@@ -3,6 +3,11 @@ Whatsapp Bot for CoWIN vaccination (with automated CAPTCHA verification)
 
 *This is absolutely for academic reference purposes only. Lagalities arising out of commercial or personal use is none of the concerns of the author(s) of this and/or any related repo*
 
+On your computer whatever number you logged in to WhatsApp with, by scanning the QR code, that number becomes the host.
+Any other mobile number who want to book, will need to send *subscribe* to the host whatsapp. After that, the bot will ask all the details it needs and begin polling the cowin server.
+When a slot is available, it will notify via whatsapp to the subscriber, send OTP and read CAPTCHA on its own before going ahead with booking.
+If the host wants to book for oneself, the host will also need to send *subscribe* message to itself.
+
 ![WhatsApp Icon](https://cdn.icon-icons.com/icons2/373/PNG/96/Whatsapp_37229.png)
 ![CoWIN Icon](https://prod-cdn.preprod.co-vin.in/assets/images/covid19logo.jpg)
 
